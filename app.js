@@ -1,34 +1,27 @@
+const http = require("http");
+const fs = require("fs");
+const crypto = require("crypto");
+const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
+
+const archivo = "minutas.json";
+
+if (!fs.existsSync("uploads")) {
+  fs.mkdirSync("uploads");
+}
+
+const upload = multer({ dest: "uploads/" });
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
-const multer = require("multer");
-const upload = multer({ dest: "uploads/" });
-const http = require("http");
-const fs = require("fs");
-const crypto = require("crypto");
-
-const archivo = "minutas.json";
 
 const usuarios = {
-  jaider: {
-    clave: "1234",
-    nombre: "Jaider García",
-    rol: "gestor"
-  },
-  jeferson: {
-    clave: "1234",
-    nombre: "Jeferson",
-    rol: "gestor"
-  },
-  wilmar: {
-    clave: "admin123",
-    nombre: "Wilmar",
-    rol: "supervisor"
-  }
+  jaider: { clave: "1234", nombre: "Jaider García", rol: "gestor" },
+  jeferson: { clave: "1234", nombre: "Jeferson", rol: "gestor" },
+  wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" }
 };
 
 const puestos = [
@@ -58,9 +51,7 @@ function getCookies(req) {
   const cookies = {};
   header.split(";").forEach(cookie => {
     const partes = cookie.trim().split("=");
-    if (partes[0] && partes[1]) {
-      cookies[partes[0]] = partes[1];
-    }
+    if (partes[0] && partes[1]) cookies[partes[0]] = partes[1];
   });
   return cookies;
 }
@@ -112,16 +103,8 @@ const estilos = `
     box-shadow: 0 4px 14px rgba(0,0,0,0.2);
   }
 
-  .marca {
-    color: #005baa;
-    margin-bottom: 3px;
-  }
-
-  .submarca {
-    color: #555;
-    font-size: 14px;
-    margin-bottom: 25px;
-  }
+  .marca { color: #005baa; margin-bottom: 3px; }
+  .submarca { color: #555; font-size: 14px; margin-bottom: 25px; }
 
   header {
     background: #005baa;
@@ -131,9 +114,7 @@ const estilos = `
     border-bottom: 6px solid #f5c542;
   }
 
-  header h1 {
-    margin: 0;
-  }
+  header h1 { margin: 0; }
 
   .contenedor {
     max-width: 950px;
@@ -164,9 +145,7 @@ const estilos = `
     box-sizing: border-box;
   }
 
-  textarea {
-    height: 105px;
-  }
+  textarea { height: 105px; }
 
   button {
     background: #005baa;
@@ -180,22 +159,16 @@ const estilos = `
     font-weight: bold;
   }
 
-  button:hover {
-    background: #003f7d;
-  }
+  button:hover { background: #003f7d; }
 
-  .card {
-    border-left: 6px solid #005baa;
-  }
+  .card { border-left: 6px solid #005baa; }
 
   .fecha {
     color: #64748b;
     font-size: 13px;
   }
 
-  h2, h3 {
-    color: #005baa;
-  }
+  h2, h3 { color: #005baa; }
 
   a {
     color: #005baa;
@@ -206,6 +179,14 @@ const estilos = `
     display: inline-block;
     margin-top: 15px;
   }
+
+  .foto {
+    width: 100%;
+    max-width: 320px;
+    border-radius: 12px;
+    margin-top: 10px;
+    border: 1px solid #ddd;
+  }
 </style>
 `;
 
@@ -213,6 +194,56 @@ const server = http.createServer((req, res) => {
   const cookies = getCookies(req);
   const sessionId = cookies.sessionId;
   const sesion = sesiones[sessionId];
+
+  if (req.method === "POST" && req.url === "/guardar") {
+    if (!sesion) {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    upload.single("foto")(req, res, async err => {
+      if (err) {
+        enviarHTML(res, `<h1>Error subiendo foto ❌</h1><a href="/app">Volver</a>`);
+        return;
+      }
+
+      let fotoUrl = "";
+
+      try {
+        if (req.file) {
+          const resultado = await cloudinary.uploader.upload(req.file.path, {
+            folder: "minutas-consota"
+          });
+
+          fotoUrl = resultado.secure_url;
+
+          fs.unlinkSync(req.file.path);
+        }
+
+        const minuta = {
+          fecha: new Date().toLocaleString("es-CO"),
+          usuario: sesion.usuario,
+          gestor: sesion.nombre,
+          puesto: req.body.puesto,
+          tipo: req.body.tipo,
+          novedad: req.body.novedad,
+          foto: fotoUrl
+        };
+
+        const minutas = leerMinutas();
+        minutas.push(minuta);
+        guardarMinutas(minutas);
+
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+      } catch (error) {
+        enviarHTML(res, `<h1>Error guardando la foto ❌</h1><a href="/app">Volver</a>`);
+      }
+    });
+
+    return;
+  }
 
   if (req.method === "POST") {
     let datos = "";
@@ -245,6 +276,7 @@ const server = http.createServer((req, res) => {
         }
 
         const id = crypto.randomBytes(16).toString("hex");
+
         sesiones[id] = {
           usuario,
           nombre: usuarios[usuario].nombre,
@@ -258,40 +290,13 @@ const server = http.createServer((req, res) => {
         res.end();
         return;
       }
-
-      if (accion === "guardar") {
-        if (!sesion) {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
-
-        const minuta = {
-          fecha: new Date().toLocaleString("es-CO"),
-          usuario: sesion.usuario,
-          gestor: sesion.nombre,
-          puesto: form.get("puesto"),
-          tipo: form.get("tipo"),
-          novedad: form.get("novedad")
-        };
-
-        const minutas = leerMinutas();
-        minutas.push(minuta);
-        guardarMinutas(minutas);
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
     });
 
     return;
   }
 
   if (req.url === "/logout") {
-    if (sessionId) {
-      delete sesiones[sessionId];
-    }
+    if (sessionId) delete sesiones[sessionId];
 
     res.writeHead(302, {
       "Set-Cookie": "sessionId=; Max-Age=0; Path=/",
@@ -323,6 +328,7 @@ const server = http.createServer((req, res) => {
         <p><b>Gestor:</b> ${m.gestor}</p>
         <p><b>Tipo:</b> ${m.tipo}</p>
         <p><b>Novedad:</b> ${m.novedad}</p>
+        ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
       </div>
     `).join("");
 
@@ -342,9 +348,7 @@ const server = http.createServer((req, res) => {
 
         <div class="contenedor">
           ${sesion.rol === "gestor" ? `
-            <form method="POST">
-              <input type="hidden" name="accion" value="guardar">
-
+            <form method="POST" action="/guardar" enctype="multipart/form-data">
               <label>Gestor</label>
               <input value="${sesion.nombre}" readonly>
 
@@ -360,10 +364,14 @@ const server = http.createServer((req, res) => {
                 <option>Novedad</option>
                 <option>Entrega de turno</option>
                 <option>Emergencia</option>
+                <option>Daño</option>
               </select>
 
               <label>Novedad</label>
               <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
+
+              <label>Foto evidencia</label>
+              <input type="file" name="foto" accept="image/*" capture="environment">
 
               <button type="submit">Guardar minuta</button>
             </form>
