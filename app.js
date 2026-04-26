@@ -21,7 +21,11 @@ cloudinary.config({
 const usuarios = {
   jaider: { clave: "1234", nombre: "Jaider García", rol: "gestor" },
   jeferson: { clave: "1234", nombre: "Jeferson", rol: "gestor" },
-  wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" }
+
+  wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" },
+  jhoneider: { clave: "admin123", nombre: "Jhoneider", rol: "supervisor" },
+  adreina: { clave: "admin123", nombre: "Adreina", rol: "supervisor" },
+  gerencia: { clave: "admin123", nombre: "Gerencia", rol: "supervisor" }
 };
 
 const puestos = [
@@ -59,6 +63,10 @@ function getCookies(req) {
 function enviarHTML(res, html) {
   res.writeHead(200, { "Content-Type": "text/html; charset=utf-8" });
   res.end(html);
+}
+
+function opcionSeleccionada(valor, actual) {
+  return valor === actual ? "selected" : "";
 }
 
 const estilos = `
@@ -117,7 +125,7 @@ const estilos = `
   header h1 { margin: 0; }
 
   .contenedor {
-    max-width: 950px;
+    max-width: 1000px;
     margin: 30px auto;
     padding: 20px;
   }
@@ -182,10 +190,56 @@ const estilos = `
 
   .foto {
     width: 100%;
-    max-width: 320px;
+    max-width: 340px;
     border-radius: 12px;
     margin-top: 10px;
     border: 1px solid #ddd;
+  }
+
+  .filtros {
+    border-top: 6px solid #f5c542;
+  }
+
+  .grid-filtros {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .botones {
+    display: flex;
+    gap: 10px;
+  }
+
+  .botones a {
+    display: block;
+    width: 100%;
+    text-align: center;
+    background: #f5c542;
+    color: #1f2937;
+    padding: 14px;
+    border-radius: 10px;
+    text-decoration: none;
+    box-sizing: border-box;
+  }
+
+  .contador {
+    background: #005baa;
+    color: white;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 15px;
+    font-weight: bold;
+  }
+
+  @media (max-width: 700px) {
+    .grid-filtros {
+      grid-template-columns: 1fr;
+    }
+
+    .login-card {
+      width: 85%;
+    }
   }
 </style>
 `;
@@ -218,11 +272,14 @@ const server = http.createServer((req, res) => {
 
           fotoUrl = resultado.secure_url;
 
-          fs.unlinkSync(req.file.path);
+          if (fs.existsSync(req.file.path)) {
+            fs.unlinkSync(req.file.path);
+          }
         }
 
         const minuta = {
           fecha: new Date().toLocaleString("es-CO"),
+          fechaFiltro: new Date().toISOString().slice(0, 10),
           usuario: sesion.usuario,
           gestor: sesion.nombre,
           puesto: req.body.puesto,
@@ -306,17 +363,37 @@ const server = http.createServer((req, res) => {
     return;
   }
 
-  if (req.url === "/app") {
+  if (req.url.startsWith("/app")) {
     if (!sesion) {
       res.writeHead(302, { Location: "/" });
       res.end();
       return;
     }
 
+    const url = new URL(req.url, "http://localhost:3000");
+
+    const filtroPuesto = url.searchParams.get("puesto") || "";
+    const filtroGestor = url.searchParams.get("gestor") || "";
+    const filtroTipo = url.searchParams.get("tipo") || "";
+    const filtroFecha = url.searchParams.get("fecha") || "";
+
     let minutas = leerMinutas();
 
     if (sesion.rol === "gestor") {
       minutas = minutas.filter(m => m.usuario === sesion.usuario);
+    }
+
+    if (sesion.rol === "supervisor") {
+      if (filtroPuesto) minutas = minutas.filter(m => m.puesto === filtroPuesto);
+      if (filtroGestor) minutas = minutas.filter(m => m.gestor === filtroGestor);
+      if (filtroTipo) minutas = minutas.filter(m => m.tipo === filtroTipo);
+
+      if (filtroFecha) {
+        minutas = minutas.filter(m => {
+          if (m.fechaFiltro) return m.fechaFiltro === filtroFecha;
+          return m.fecha && m.fecha.includes(filtroFecha);
+        });
+      }
     }
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
@@ -331,6 +408,55 @@ const server = http.createServer((req, res) => {
         ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
       </div>
     `).join("");
+
+    const filtrosSupervisor = `
+      <form class="filtros" method="GET" action="/app">
+        <h2>Filtros de supervisor</h2>
+
+        <div class="grid-filtros">
+          <div>
+            <label>Puesto</label>
+            <select name="puesto">
+              <option value="">Todos</option>
+              ${puestos.map(p => `<option value="${p}" ${opcionSeleccionada(p, filtroPuesto)}>${p}</option>`).join("")}
+            </select>
+          </div>
+
+          <div>
+            <label>Gestor</label>
+            <select name="gestor">
+              <option value="">Todos</option>
+              <option value="Jaider García" ${opcionSeleccionada("Jaider García", filtroGestor)}>Jaider García</option>
+              <option value="Jeferson" ${opcionSeleccionada("Jeferson", filtroGestor)}>Jeferson</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Tipo</label>
+            <select name="tipo">
+              <option value="">Todos</option>
+              <option value="Inicio de turno" ${opcionSeleccionada("Inicio de turno", filtroTipo)}>Inicio de turno</option>
+              <option value="Ronda" ${opcionSeleccionada("Ronda", filtroTipo)}>Ronda</option>
+              <option value="Novedad" ${opcionSeleccionada("Novedad", filtroTipo)}>Novedad</option>
+              <option value="Entrega de turno" ${opcionSeleccionada("Entrega de turno", filtroTipo)}>Entrega de turno</option>
+              <option value="Emergencia" ${opcionSeleccionada("Emergencia", filtroTipo)}>Emergencia</option>
+              <option value="Daño" ${opcionSeleccionada("Daño", filtroTipo)}>Daño</option>
+            </select>
+          </div>
+
+          <div>
+            <label>Fecha</label>
+            <input type="date" name="fecha" value="${filtroFecha}">
+          </div>
+        </div>
+
+        <button type="submit">Aplicar filtros</button>
+
+        <div class="botones" style="margin-top:10px;">
+          <a href="/app">Quitar filtros</a>
+        </div>
+      </form>
+    `;
 
     enviarHTML(res, `
       <html>
@@ -347,6 +473,8 @@ const server = http.createServer((req, res) => {
         </header>
 
         <div class="contenedor">
+          ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
+
           ${sesion.rol === "gestor" ? `
             <form method="POST" action="/guardar" enctype="multipart/form-data">
               <label>Gestor</label>
@@ -381,6 +509,10 @@ const server = http.createServer((req, res) => {
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
             </div>
           `}
+
+          <div class="contador">
+            Total de minutas mostradas: ${minutas.length}
+          </div>
 
           <h2>Historial de minutas</h2>
           ${historial || "<p>No hay minutas guardadas todavía.</p>"}
