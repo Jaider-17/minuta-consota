@@ -420,17 +420,3 @@ const PORT = process.env.PORT || 3000;
 server.listen(PORT, "0.0.0.0", () => {
   console.log("Servidor corriendo en puerto " + PORT);
 });
-app.listen(...)
-app.post("/subir-foto", upload.single("foto"), async (req, res) => {
-  try {
-    const result = await cloudinary.uploader.upload(req.file.path);
-
-    res.json({
-      mensaje: "Foto subida",
-      url: result.secure_url
-    });
-
-  } catch (error) {
-    res.status(500).json({ error: "Error subiendo foto" });
-  }
-});
