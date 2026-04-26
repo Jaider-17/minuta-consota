@@ -1,4 +1,24 @@
 const http = require("http");
+const { MongoClient } = require("mongodb");
+
+const MONGO_URL = "mongodb+srv://Jaider:1004756226@cluster0.rue5x5j.mongodb.net/?appName=Cluster0";
+
+const client = new MongoClient(MONGO_URL);
+
+let db;
+
+async function conectarDB() {
+  try {
+    await client.connect();
+    db = client.db("minutasDB");
+    console.log("🔥 Conectado a MongoDB");
+  } catch (error) {
+    console.error("❌ Error conectando a MongoDB:", error);
+  }
+}
+
+conectarDB();
+
 const fs = require("fs");
 const crypto = require("crypto");
 const multer = require("multer");
@@ -252,8 +272,8 @@ const estilos = `
   }
 </style>
 `;
+const server = http.createServer(async (req, res) => {
 
-const server = http.createServer((req, res) => {
   const cookies = getCookies(req);
   const sessionId = cookies.sessionId;
   const sesion = sesiones[sessionId];
@@ -350,8 +370,7 @@ const server = http.createServer((req, res) => {
         };
 
         const minutas = leerMinutas();
-        minutas.push(minuta);
-        guardarMinutas(minutas);
+      await db.collection("minutas").insertOne(minuta);
 
         res.writeHead(302, { Location: "/app" });
         res.end();
@@ -438,7 +457,7 @@ const server = http.createServer((req, res) => {
     const filtroTipo = url.searchParams.get("tipo") || "";
     const filtroFecha = url.searchParams.get("fecha") || "";
 
-    let minutas = leerMinutas();
+let minutas = await db.collection("minutas").find().toArray();
 
     if (sesion.rol === "gestor") {
       minutas = minutas.filter(m => m.usuario === sesion.usuario);
