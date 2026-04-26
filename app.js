@@ -316,31 +316,11 @@ const server = http.createServer((req, res) => {
       return;
     }
 
-  let minutas = leerMinutas();
+    let minutas = leerMinutas();
 
-const url = new URL(req.url, "http://localhost:3000");
-
-const filtroPuesto = url.searchParams.get("puesto") || "";
-const filtroGestor = url.searchParams.get("gestor") || "";
-const filtroFecha = url.searchParams.get("fecha") || "";
-
-if (sesion.rol === "gestor") {
-  minutas = minutas.filter(m => m.usuario === sesion.usuario);
-}
-
-if (sesion.rol === "supervisor") {
-  if (filtroPuesto) {
-    minutas = minutas.filter(m => m.puesto === filtroPuesto);
-  }
-
-  if (filtroGestor) {
-    minutas = minutas.filter(m => m.gestor === filtroGestor);
-  }
-
-  if (filtroFecha) {
-    minutas = minutas.filter(m => m.fecha && m.fecha.includes(filtroFecha));
-  }
-}
+    if (sesion.rol === "gestor") {
+      minutas = minutas.filter(m => m.usuario === sesion.usuario);
+    }
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
@@ -370,36 +350,7 @@ if (sesion.rol === "supervisor") {
         </header>
 
         <div class="contenedor">
-          ${sesion.rol === "supervisor" ? `
-  <form method="GET" action="/app">
-    <h2>Filtros de supervisor</h2>
-
-    <label>Filtrar por puesto</label>
-    <select name="puesto">
-      <option value="">Todos</option>
-      <option>Taquilla Consotá</option>
-      <option>Pereira Antigua</option>
-      <option>Granja</option>
-      <option>Clínica</option>
-      <option>Portería</option>
-      <option>Otro</option>
-    </select>
-
-    <label>Filtrar por gestor</label>
-    <select name="gestor">
-      <option value="">Todos</option>
-      <option>Jaider García</option>
-      <option>Jeferson</option>
-    </select>
-
-    <label>Filtrar por fecha</label>
-    <input type="text" name="fecha" placeholder="Ej: 25/4/2026">
-
-    <button type="submit">Aplicar filtros</button>
-  </form>
-
-  <a href="/app">Quitar filtros</a>
-` : ""}
+          ${sesion.rol === "gestor" ? `
             <form method="POST" action="/guardar" enctype="multipart/form-data">
               <label>Gestor</label>
               <input value="${sesion.nombre}" readonly>
