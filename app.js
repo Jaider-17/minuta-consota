@@ -18,21 +18,29 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
-
 const usuarios = {
+  // GESTORES
   jaider: { clave: "1234", nombre: "Jaider García", rol: "gestor" },
   jeferson: { clave: "1234", nombre: "Jeferson", rol: "gestor" },
+  james: { clave: "1234", nombre: "James", rol: "gestor" },
+  santiago: { clave: "1234", nombre: "Santiago", rol: "gestor" },
+  edwin: { clave: "1234", nombre: "Edwin", rol: "gestor" },
+  elmerson: { clave: "1234", nombre: "Elmerson", rol: "gestor" },
+  edrian: { clave: "1234", nombre: "Edrian Alexander", rol: "gestor" },
 
+  // SUPERVISORES
   wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" },
   jhoneider: { clave: "admin123", nombre: "Jhoneider", rol: "supervisor" },
   adreina: { clave: "admin123", nombre: "Adreina", rol: "supervisor" },
-  gerencia: { clave: "admin123", nombre: "Gerencia", rol: "supervisor" }
+  gerencia: { clave: "admin123", nombre: "Gerencia Administrativa", rol: "supervisor" }
 };
 
 const puestos = [
-  "Taquilla Consotá",
-  "Pereira Antigua",
   "Granja",
+  "Pereira Antigua",
+  "Taquilla",
+  "Ronda",
+  "Liceo",
   "Clínica",
   "Portería",
   "Otro"
