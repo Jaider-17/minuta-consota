@@ -3,6 +3,7 @@ const fs = require("fs");
 const crypto = require("crypto");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
+const ExcelJS = require("exceljs");
 
 const archivo = "minutas.json";
 
@@ -248,6 +249,58 @@ const server = http.createServer((req, res) => {
   const cookies = getCookies(req);
   const sessionId = cookies.sessionId;
   const sesion = sesiones[sessionId];
+  if (req.url.startsWith("/exportar-excel")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, "http://localhost:3000");
+
+    const filtroPuesto = url.searchParams.get("puesto") || "";
+    const filtroGestor = url.searchParams.get("gestor") || "";
+    const filtroTipo = url.searchParams.get("tipo") || "";
+    const filtroFecha = url.searchParams.get("fecha") || "";
+
+    let minutas = leerMinutas();
+
+    if (filtroPuesto) minutas = minutas.filter(m => m.puesto === filtroPuesto);
+    if (filtroGestor) minutas = minutas.filter(m => m.gestor === filtroGestor);
+    if (filtroTipo) minutas = minutas.filter(m => m.tipo === filtroTipo);
+
+    if (filtroFecha) {
+      minutas = minutas.filter(m => {
+        if (m.fechaFiltro) return m.fechaFiltro === filtroFecha;
+        return m.fecha && m.fecha.includes(filtroFecha);
+      });
+    }
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Minutas");
+
+    worksheet.columns = [
+      { header: "Fecha", key: "fecha", width: 24 },
+      { header: "Gestor", key: "gestor", width: 22 },
+      { header: "Puesto", key: "puesto", width: 25 },
+      { header: "Tipo", key: "tipo", width: 20 },
+      { header: "Novedad", key: "novedad", width: 50 },
+      { header: "Foto", key: "foto", width: 55 }
+    ];
+
+    minutas.forEach(m => worksheet.addRow(m));
+
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": "attachment; filename=minutas.xlsx"
+    });
+
+    workbook.xlsx.write(res).then(() => {
+      res.end();
+    });
+
+    return;
+  }
 
   if (req.method === "POST" && req.url === "/guardar") {
     if (!sesion) {
@@ -451,6 +504,10 @@ const server = http.createServer((req, res) => {
         </div>
 
         <button type="submit">Aplicar filtros</button>
+
+<div class="botones" style="margin-top:10px;">
+  <a href="/exportar-excel?puesto=${filtroPuesto}&gestor=${filtroGestor}&tipo=${filtroTipo}&fecha=${filtroFecha}">📊 Descargar Excel</a>
+</div>
 
         <div class="botones" style="margin-top:10px;">
           <a href="/app">Quitar filtros</a>
