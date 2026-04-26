@@ -21,12 +21,9 @@ cloudinary.config({
 const usuarios = {
   jaider: { clave: "1234", nombre: "Jaider García", rol: "gestor" },
   jeferson: { clave: "1234", nombre: "Jeferson", rol: "gestor" },
-
-  wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" },
-  jhoneider: { clave: "admin123", nombre: "Jhoneider", rol: "supervisor" },
-  adreina: { clave: "admin123", nombre: "Adreina", rol: "supervisor" },
-  gerencia: { clave: "admin123", nombre: "Gerencia", rol: "supervisor" }
+  wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" }
 };
+
 const puestos = [
   "Taquilla Consotá",
   "Pereira Antigua",
