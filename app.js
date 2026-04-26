@@ -459,16 +459,43 @@ const server = http.createServer((req, res) => {
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
-    const historial = minutas.reverse().map(m => `
-      <div class="card">
-        <div class="fecha">${m.fecha}</div>
-        <h3>${m.puesto}</h3>
-        <p><b>Gestor:</b> ${m.gestor}</p>
-        <p><b>Tipo:</b> ${m.tipo}</p>
-        <p><b>Novedad:</b> ${m.novedad}</p>
-        ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
-      </div>
-    `).join("");
+   const historial = minutas.reverse().map(m => {
+
+  const texto = (m.novedad || "").toLowerCase();
+
+  let claseAlerta = "";
+  let etiqueta = "";
+
+  if (
+    texto.includes("emergencia") ||
+    texto.includes("robo") ||
+    texto.includes("accidente") ||
+    texto.includes("urgente")
+  ) {
+    claseAlerta = "alerta-roja";
+    etiqueta = "🚨 ALERTA CRÍTICA";
+  } else if (
+    texto.includes("daño") ||
+    texto.includes("problema") ||
+    texto.includes("falla")
+  ) {
+    claseAlerta = "alerta-amarilla";
+    etiqueta = "⚠️ Atención";
+  }
+
+  return `
+    <div class="card ${claseAlerta}">
+      <div class="fecha">${m.fecha}</div>
+      <h3>${m.puesto}</h3>
+      ${etiqueta ? `<div class="etiqueta">${etiqueta}</div>` : ""}
+      <p><b>Gestor:</b> ${m.gestor}</p>
+      <p><b>Tipo:</b> ${m.tipo}</p>
+      <p><b>Novedad:</b> ${m.novedad}</p>
+      ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
+    </div>
+  `;
+}).join("");
+
 
     const filtrosSupervisor = `
       <form class="filtros" method="GET" action="/app">
@@ -620,7 +647,7 @@ const server = http.createServer((req, res) => {
   `);
 });
 
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 10000;
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log("Servidor corriendo en puerto " + PORT);
