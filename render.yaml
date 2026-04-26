@@ -1,0 +1,6 @@
+services:
+  - type: web
+    name: minuta-consota
+    env: node
+    buildCommand: ""
+    startCommand: "node app.js"

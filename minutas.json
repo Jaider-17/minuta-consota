@@ -1,0 +1,44 @@
+[
+  {
+    "fecha": "25/4/2026, 2:07:33 a. m.",
+    "puesto": "Granja",
+    "gestor": "Jaider Garcia",
+    "novedad": "el techo de finca dañado"
+  },
+  {
+    "fecha": "25/4/2026, 2:08:36 a. m.",
+    "puesto": "Granja",
+    "gestor": "Jaider Garcia",
+    "novedad": "techo finca dañada "
+  },
+  {
+    "fecha": "25/4/2026, 2:19:06 a. m.",
+    "puesto": "Granja",
+    "gestor": "Jaider Garcia",
+    "novedad": "techo finca dañada "
+  },
+  {
+    "fecha": "25/4/2026, 11:50:57 a. m.",
+    "puesto": "Taquilla Consota",
+    "puestoBonito": "Taquilla Consotá",
+    "gestor": "Jaider Garcia",
+    "tipo": "Inicio de turno",
+    "novedad": "ingreso a turno a las 5.00"
+  },
+  {
+    "fecha": "25/4/2026, 8:25:53 p. m.",
+    "puesto": "Taquilla Consota",
+    "puestoBonito": "Taquilla Consotá",
+    "gestor": "Jaider Garcia",
+    "tipo": "Inicio de turno",
+    "novedad": "se colaron 2 personas"
+  },
+  {
+    "fecha": "25/4/2026, 8:28:48 p. m.",
+    "puesto": "Granja",
+    "puestoBonito": "Granja",
+    "gestor": "Jaider Garcia",
+    "tipo": "Inicio de turno",
+    "novedad": "ingreso a mi punto de trabajo"
+  }
+]
