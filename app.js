@@ -1,10 +1,14 @@
 const http = require("http");
-const { MongoClient } = require("mongodb");
+const { MongoClient, ObjectId } = require("mongodb");
+const fs = require("fs");
+const crypto = require("crypto");
+const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const ExcelJS = require("exceljs");
 
 const MONGO_URL = "mongodb+srv://Jaider:1004756226@cluster0.rue5x5j.mongodb.net/?appName=Cluster0";
 
 const client = new MongoClient(MONGO_URL);
-
 let db;
 
 async function conectarDB() {
@@ -17,15 +21,7 @@ async function conectarDB() {
   }
 }
 
-conectarDB();
-
-const fs = require("fs");
-const crypto = require("crypto");
-const multer = require("multer");
-const cloudinary = require("cloudinary").v2;
-const ExcelJS = require("exceljs");
-
-const archivo = "minutas.json";
+const dbReady = conectarDB();
 
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
@@ -38,8 +34,8 @@ cloudinary.config({
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET
 });
+
 const usuarios = {
-  // GESTORES
   jaider: { clave: "1234", nombre: "Jaider García", rol: "gestor" },
   jeferson: { clave: "1234", nombre: "Jeferson", rol: "gestor" },
   james: { clave: "1234", nombre: "James", rol: "gestor" },
@@ -48,7 +44,6 @@ const usuarios = {
   elmerson: { clave: "1234", nombre: "Elmerson", rol: "gestor" },
   edrian: { clave: "1234", nombre: "Edrian Alexander", rol: "gestor" },
 
-  // SUPERVISORES
   wilmar: { clave: "admin123", nombre: "Wilmar", rol: "supervisor" },
   jhoneider: { clave: "admin123", nombre: "Jhoneider", rol: "supervisor" },
   adreina: { clave: "admin123", nombre: "Adreina", rol: "supervisor" },
@@ -66,18 +61,16 @@ const puestos = [
   "Otro"
 ];
 
+const tipos = [
+  "Inicio de turno",
+  "Ronda",
+  "Novedad",
+  "Entrega de turno",
+  "Emergencia",
+  "Daño"
+];
+
 const sesiones = {};
-
-function leerMinutas() {
-  if (fs.existsSync(archivo)) {
-    return JSON.parse(fs.readFileSync(archivo, "utf8"));
-  }
-  return [];
-}
-
-function guardarMinutas(minutas) {
-  fs.writeFileSync(archivo, JSON.stringify(minutas, null, 2), "utf8");
-}
 
 function getCookies(req) {
   const header = req.headers.cookie || "";
@@ -96,6 +89,57 @@ function enviarHTML(res, html) {
 
 function opcionSeleccionada(valor, actual) {
   return valor === actual ? "selected" : "";
+}
+
+function detectarAlerta(novedad = "") {
+  const texto = novedad.toLowerCase();
+
+  if (
+    texto.includes("emergencia") ||
+    texto.includes("robo") ||
+    texto.includes("accidente") ||
+    texto.includes("urgente")
+  ) {
+    return { clase: "alerta-roja", etiqueta: "🚨 ALERTA CRÍTICA" };
+  }
+
+  if (
+    texto.includes("daño") ||
+    texto.includes("problema") ||
+    texto.includes("falla")
+  ) {
+    return { clase: "alerta-amarilla", etiqueta: "⚠️ Atención" };
+  }
+
+  return { clase: "", etiqueta: "" };
+}
+
+async function obtenerMinutasFiltradas(url, sesion) {
+  let minutas = await db.collection("minutas").find().toArray();
+
+  const filtroPuesto = url.searchParams.get("puesto") || "";
+  const filtroGestor = url.searchParams.get("gestor") || "";
+  const filtroTipo = url.searchParams.get("tipo") || "";
+  const filtroFecha = url.searchParams.get("fecha") || "";
+
+  if (sesion && sesion.rol === "gestor") {
+    minutas = minutas.filter(m => m.usuario === sesion.usuario);
+  }
+
+  if (sesion && sesion.rol === "supervisor") {
+    if (filtroPuesto) minutas = minutas.filter(m => m.puesto === filtroPuesto);
+    if (filtroGestor) minutas = minutas.filter(m => m.gestor === filtroGestor);
+    if (filtroTipo) minutas = minutas.filter(m => m.tipo === filtroTipo);
+
+    if (filtroFecha) {
+      minutas = minutas.filter(m => {
+        if (m.fechaFiltro) return m.fechaFiltro === filtroFecha;
+        return m.fecha && m.fecha.includes(filtroFecha);
+      });
+    }
+  }
+
+  return minutas;
 }
 
 const estilos = `
@@ -154,7 +198,7 @@ const estilos = `
   header h1 { margin: 0; }
 
   .contenedor {
-    max-width: 1000px;
+    max-width: 1050px;
     margin: 30px auto;
     padding: 20px;
   }
@@ -184,19 +228,31 @@ const estilos = `
 
   textarea { height: 105px; }
 
-  button {
+  button, .btn {
     background: #005baa;
     color: white;
-    padding: 14px;
-    width: 100%;
+    padding: 12px 14px;
     border: none;
     border-radius: 10px;
-    font-size: 16px;
+    font-size: 15px;
     cursor: pointer;
     font-weight: bold;
+    text-decoration: none;
+    display: inline-block;
+    text-align: center;
   }
 
-  button:hover { background: #003f7d; }
+  button:hover, .btn:hover { background: #003f7d; }
+
+  .btn-danger { background: #dc2626; }
+  .btn-danger:hover { background: #991b1b; }
+
+  .btn-warning {
+    background: #f5c542;
+    color: #1f2937;
+  }
+
+  .btn-warning:hover { background: #d9a51e; }
 
   .card { border-left: 6px solid #005baa; }
 
@@ -238,18 +294,11 @@ const estilos = `
   .botones {
     display: flex;
     gap: 10px;
+    flex-wrap: wrap;
   }
 
-  .botones a {
-    display: block;
-    width: 100%;
-    text-align: center;
-    background: #f5c542;
-    color: #1f2937;
-    padding: 14px;
-    border-radius: 10px;
-    text-decoration: none;
-    box-sizing: border-box;
+  .botones a, .botones button {
+    flex: 1;
   }
 
   .contador {
@@ -261,22 +310,68 @@ const estilos = `
     font-weight: bold;
   }
 
+  .dashboard {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 15px;
+  }
+
+  .metric {
+    background: #eaf3ff;
+    border-left: 6px solid #005baa;
+    padding: 15px;
+    border-radius: 12px;
+  }
+
+  .metric strong {
+    font-size: 24px;
+    color: #005baa;
+  }
+
+  .alerta-roja {
+    border-left: 6px solid #dc2626 !important;
+    background: #fee2e2;
+  }
+
+  .alerta-amarilla {
+    border-left: 6px solid #f59e0b !important;
+    background: #fef3c7;
+  }
+
+  .etiqueta {
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+
   @media (max-width: 700px) {
-    .grid-filtros {
+    .grid-filtros, .dashboard {
       grid-template-columns: 1fr;
     }
 
     .login-card {
       width: 85%;
     }
+
+    .botones {
+      flex-direction: column;
+    }
+  }
+
+  @media print {
+    button, .cerrar, .no-print {
+      display: none !important;
+    }
   }
 </style>
 `;
+
 const server = http.createServer(async (req, res) => {
+  await dbReady;
 
   const cookies = getCookies(req);
   const sessionId = cookies.sessionId;
   const sesion = sesiones[sessionId];
+
   if (req.url.startsWith("/exportar-excel")) {
     if (!sesion || sesion.rol !== "supervisor") {
       res.writeHead(302, { Location: "/" });
@@ -284,25 +379,8 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const url = new URL(req.url, "http://localhost:3000");
-
-    const filtroPuesto = url.searchParams.get("puesto") || "";
-    const filtroGestor = url.searchParams.get("gestor") || "";
-    const filtroTipo = url.searchParams.get("tipo") || "";
-    const filtroFecha = url.searchParams.get("fecha") || "";
-
-    let minutas = leerMinutas();
-
-    if (filtroPuesto) minutas = minutas.filter(m => m.puesto === filtroPuesto);
-    if (filtroGestor) minutas = minutas.filter(m => m.gestor === filtroGestor);
-    if (filtroTipo) minutas = minutas.filter(m => m.tipo === filtroTipo);
-
-    if (filtroFecha) {
-      minutas = minutas.filter(m => {
-        if (m.fechaFiltro) return m.fechaFiltro === filtroFecha;
-        return m.fecha && m.fecha.includes(filtroFecha);
-      });
-    }
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const minutas = await obtenerMinutasFiltradas(url, sesion);
 
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet("Minutas");
@@ -323,15 +401,53 @@ const server = http.createServer(async (req, res) => {
       "Content-Disposition": "attachment; filename=minutas.xlsx"
     });
 
-    workbook.xlsx.write(res).then(() => {
-      res.end();
-    });
+    await workbook.xlsx.write(res);
+    res.end();
+    return;
+  }
 
+  if (req.url.startsWith("/exportar-pdf")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const minutas = await obtenerMinutasFiltradas(url, sesion);
+
+    const contenido = minutas.map(m => `
+      <div class="card">
+        <div class="fecha">${m.fecha}</div>
+        <h3>${m.puesto}</h3>
+        <p><b>Gestor:</b> ${m.gestor}</p>
+        <p><b>Tipo:</b> ${m.tipo}</p>
+        <p><b>Novedad:</b> ${m.novedad}</p>
+        ${m.foto ? `<p><b>Foto:</b> ${m.foto}</p>` : ""}
+      </div>
+    `).join("");
+
+    enviarHTML(res, `
+      <html>
+      <head>
+        <title>Reporte de Minutas</title>
+        ${estilos}
+      </head>
+      <body>
+        <div class="contenedor">
+          <h1>Reporte de Minutas</h1>
+          <p>Total de registros: ${minutas.length}</p>
+          <button onclick="window.print()">📄 Descargar / Imprimir PDF</button>
+          ${contenido || "<p>No hay minutas para este reporte.</p>"}
+        </div>
+      </body>
+      </html>
+    `);
     return;
   }
 
   if (req.method === "POST" && req.url === "/guardar") {
-    if (!sesion) {
+    if (!sesion || sesion.rol !== "gestor") {
       res.writeHead(302, { Location: "/" });
       res.end();
       return;
@@ -369,13 +485,13 @@ const server = http.createServer(async (req, res) => {
           foto: fotoUrl
         };
 
-        const minutas = leerMinutas();
-      await db.collection("minutas").insertOne(minuta);
+        await db.collection("minutas").insertOne(minuta);
 
         res.writeHead(302, { Location: "/app" });
         res.end();
       } catch (error) {
-        enviarHTML(res, `<h1>Error guardando la foto ❌</h1><a href="/app">Volver</a>`);
+        console.error("Error guardando minuta:", error);
+        enviarHTML(res, `<h1>Error guardando la minuta ❌</h1><a href="/app">Volver</a>`);
       }
     });
 
@@ -387,7 +503,7 @@ const server = http.createServer(async (req, res) => {
 
     req.on("data", parte => datos += parte);
 
-    req.on("end", () => {
+    req.on("end", async () => {
       const form = new URLSearchParams(datos);
       const accion = form.get("accion");
 
@@ -427,6 +543,49 @@ const server = http.createServer(async (req, res) => {
         res.end();
         return;
       }
+
+      if (accion === "eliminar") {
+        if (!sesion || sesion.rol !== "supervisor") {
+          res.writeHead(302, { Location: "/" });
+          res.end();
+          return;
+        }
+
+        const id = form.get("id");
+
+        await db.collection("minutas").deleteOne({
+          _id: new ObjectId(id)
+        });
+
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+        return;
+      }
+
+      if (accion === "actualizar") {
+        if (!sesion || sesion.rol !== "supervisor") {
+          res.writeHead(302, { Location: "/" });
+          res.end();
+          return;
+        }
+
+        const id = form.get("id");
+
+        await db.collection("minutas").updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              puesto: form.get("puesto"),
+              tipo: form.get("tipo"),
+              novedad: form.get("novedad")
+            }
+          }
+        );
+
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+        return;
+      }
     });
 
     return;
@@ -443,6 +602,70 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.url.startsWith("/editar")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const id = url.searchParams.get("id");
+
+    const minuta = await db.collection("minutas").findOne({
+      _id: new ObjectId(id)
+    });
+
+    if (!minuta) {
+      enviarHTML(res, `<h1>Minuta no encontrada</h1><a href="/app">Volver</a>`);
+      return;
+    }
+
+    const opcionesPuestos = puestos.map(p => `
+      <option value="${p}" ${opcionSeleccionada(p, minuta.puesto)}>${p}</option>
+    `).join("");
+
+    const opcionesTipos = tipos.map(t => `
+      <option value="${t}" ${opcionSeleccionada(t, minuta.tipo)}>${t}</option>
+    `).join("");
+
+    enviarHTML(res, `
+      <html>
+      <head>
+        <title>Editar minuta</title>
+        ${estilos}
+      </head>
+      <body>
+        <header>
+          <div class="logo">CF</div>
+          <h1>Editar Minuta</h1>
+        </header>
+
+        <div class="contenedor">
+          <form method="POST">
+            <input type="hidden" name="accion" value="actualizar">
+            <input type="hidden" name="id" value="${id}">
+
+            <label>Puesto</label>
+            <select name="puesto" required>${opcionesPuestos}</select>
+
+            <label>Tipo</label>
+            <select name="tipo" required>${opcionesTipos}</select>
+
+            <label>Novedad</label>
+            <textarea name="novedad" required>${minuta.novedad || ""}</textarea>
+
+            <button type="submit">Guardar cambios</button>
+          </form>
+
+          <a href="/app">Volver</a>
+        </div>
+      </body>
+      </html>
+    `);
+    return;
+  }
+
   if (req.url.startsWith("/app")) {
     if (!sesion) {
       res.writeHead(302, { Location: "/" });
@@ -450,74 +673,65 @@ const server = http.createServer(async (req, res) => {
       return;
     }
 
-    const url = new URL(req.url, "http://localhost:3000");
+    const url = new URL(req.url, `http://${req.headers.host}`);
 
     const filtroPuesto = url.searchParams.get("puesto") || "";
     const filtroGestor = url.searchParams.get("gestor") || "";
     const filtroTipo = url.searchParams.get("tipo") || "";
     const filtroFecha = url.searchParams.get("fecha") || "";
 
-let minutas = await db.collection("minutas").find().toArray();
-
-    if (sesion.rol === "gestor") {
-      minutas = minutas.filter(m => m.usuario === sesion.usuario);
-    }
-
-    if (sesion.rol === "supervisor") {
-      if (filtroPuesto) minutas = minutas.filter(m => m.puesto === filtroPuesto);
-      if (filtroGestor) minutas = minutas.filter(m => m.gestor === filtroGestor);
-      if (filtroTipo) minutas = minutas.filter(m => m.tipo === filtroTipo);
-
-      if (filtroFecha) {
-        minutas = minutas.filter(m => {
-          if (m.fechaFiltro) return m.fechaFiltro === filtroFecha;
-          return m.fecha && m.fecha.includes(filtroFecha);
-        });
-      }
-    }
+    let minutas = await obtenerMinutasFiltradas(url, sesion);
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
-   const historial = minutas.reverse().map(m => {
+    const totalMinutas = minutas.length;
+    const hoy = new Date().toISOString().slice(0, 10);
+    const minutasHoy = minutas.filter(m => m.fechaFiltro === hoy).length;
 
-  const texto = (m.novedad || "").toLowerCase();
+    const porPuesto = {};
+    minutas.forEach(m => {
+      porPuesto[m.puesto] = (porPuesto[m.puesto] || 0) + 1;
+    });
 
-  let claseAlerta = "";
-  let etiqueta = "";
+    const porGestor = {};
+    minutas.forEach(m => {
+      porGestor[m.gestor] = (porGestor[m.gestor] || 0) + 1;
+    });
 
-  if (
-    texto.includes("emergencia") ||
-    texto.includes("robo") ||
-    texto.includes("accidente") ||
-    texto.includes("urgente")
-  ) {
-    claseAlerta = "alerta-roja";
-    etiqueta = "🚨 ALERTA CRÍTICA";
-  } else if (
-    texto.includes("daño") ||
-    texto.includes("problema") ||
-    texto.includes("falla")
-  ) {
-    claseAlerta = "alerta-amarilla";
-    etiqueta = "⚠️ Atención";
-  }
+    const historial = minutas.reverse().map(m => {
+      const alerta = detectarAlerta(m.novedad);
 
-  return `
-    <div class="card ${claseAlerta}">
-      <div class="fecha">${m.fecha}</div>
-      <h3>${m.puesto}</h3>
-      ${etiqueta ? `<div class="etiqueta">${etiqueta}</div>` : ""}
-      <p><b>Gestor:</b> ${m.gestor}</p>
-      <p><b>Tipo:</b> ${m.tipo}</p>
-      <p><b>Novedad:</b> ${m.novedad}</p>
-      ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
-    </div>
-  `;
-}).join("");
+      return `
+        <div class="card ${alerta.clase}">
+          <div class="fecha">${m.fecha}</div>
+          <h3>${m.puesto}</h3>
+          ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
+          <p><b>Gestor:</b> ${m.gestor}</p>
+          <p><b>Tipo:</b> ${m.tipo}</p>
+          <p><b>Novedad:</b> ${m.novedad}</p>
+          ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
 
+          ${sesion.rol === "supervisor" ? `
+            <div class="botones no-print" style="margin-top:10px;">
+              <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
+
+              <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
+                <input type="hidden" name="accion" value="eliminar">
+                <input type="hidden" name="id" value="${m._id}">
+                <button class="btn-danger" type="submit">🗑️ Eliminar</button>
+              </form>
+            </div>
+          ` : ""}
+        </div>
+      `;
+    }).join("");
+
+    const gestoresSistema = Object.values(usuarios)
+      .filter(u => u.rol === "gestor")
+      .map(u => u.nombre);
 
     const filtrosSupervisor = `
-      <form class="filtros" method="GET" action="/app">
+      <form class="filtros no-print" method="GET" action="/app">
         <h2>Filtros de supervisor</h2>
 
         <div class="grid-filtros">
@@ -533,8 +747,7 @@ let minutas = await db.collection("minutas").find().toArray();
             <label>Gestor</label>
             <select name="gestor">
               <option value="">Todos</option>
-              <option value="Jaider García" ${opcionSeleccionada("Jaider García", filtroGestor)}>Jaider García</option>
-              <option value="Jeferson" ${opcionSeleccionada("Jeferson", filtroGestor)}>Jeferson</option>
+              ${gestoresSistema.map(g => `<option value="${g}" ${opcionSeleccionada(g, filtroGestor)}>${g}</option>`).join("")}
             </select>
           </div>
 
@@ -542,12 +755,7 @@ let minutas = await db.collection("minutas").find().toArray();
             <label>Tipo</label>
             <select name="tipo">
               <option value="">Todos</option>
-              <option value="Inicio de turno" ${opcionSeleccionada("Inicio de turno", filtroTipo)}>Inicio de turno</option>
-              <option value="Ronda" ${opcionSeleccionada("Ronda", filtroTipo)}>Ronda</option>
-              <option value="Novedad" ${opcionSeleccionada("Novedad", filtroTipo)}>Novedad</option>
-              <option value="Entrega de turno" ${opcionSeleccionada("Entrega de turno", filtroTipo)}>Entrega de turno</option>
-              <option value="Emergencia" ${opcionSeleccionada("Emergencia", filtroTipo)}>Emergencia</option>
-              <option value="Daño" ${opcionSeleccionada("Daño", filtroTipo)}>Daño</option>
+              ${tipos.map(t => `<option value="${t}" ${opcionSeleccionada(t, filtroTipo)}>${t}</option>`).join("")}
             </select>
           </div>
 
@@ -559,14 +767,36 @@ let minutas = await db.collection("minutas").find().toArray();
 
         <button type="submit">Aplicar filtros</button>
 
-<div class="botones" style="margin-top:10px;">
-  <a href="/exportar-excel?puesto=${filtroPuesto}&gestor=${filtroGestor}&tipo=${filtroTipo}&fecha=${filtroFecha}">📊 Descargar Excel</a>
-</div>
-
         <div class="botones" style="margin-top:10px;">
-          <a href="/app">Quitar filtros</a>
+          <a class="btn btn-warning" href="/exportar-excel?puesto=${filtroPuesto}&gestor=${filtroGestor}&tipo=${filtroTipo}&fecha=${filtroFecha}">📊 Descargar Excel</a>
+          <a class="btn btn-warning" href="/exportar-pdf?puesto=${filtroPuesto}&gestor=${filtroGestor}&tipo=${filtroTipo}&fecha=${filtroFecha}">📄 Descargar PDF</a>
+          <a class="btn btn-warning" href="/app">Quitar filtros</a>
         </div>
       </form>
+    `;
+
+    const dashboardSupervisor = `
+      <div class="panel">
+        <h2>📊 Dashboard Gerencial</h2>
+
+        <div class="dashboard">
+          <div class="metric">
+            <p>Total minutas</p>
+            <strong>${totalMinutas}</strong>
+          </div>
+
+          <div class="metric">
+            <p>Minutas hoy</p>
+            <strong>${minutasHoy}</strong>
+          </div>
+        </div>
+
+        <h3>Por puesto</h3>
+        ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
+
+        <h3>Por gestor</h3>
+        ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
+      </div>
     `;
 
     enviarHTML(res, `
@@ -585,6 +815,7 @@ let minutas = await db.collection("minutas").find().toArray();
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
+          ${sesion.rol === "supervisor" ? dashboardSupervisor : ""}
 
           ${sesion.rol === "gestor" ? `
             <form method="POST" action="/guardar" enctype="multipart/form-data">
@@ -598,12 +829,7 @@ let minutas = await db.collection("minutas").find().toArray();
 
               <label>Tipo de registro</label>
               <select name="tipo" required>
-                <option>Inicio de turno</option>
-                <option>Ronda</option>
-                <option>Novedad</option>
-                <option>Entrega de turno</option>
-                <option>Emergencia</option>
-                <option>Daño</option>
+                ${tipos.map(t => `<option>${t}</option>`).join("")}
               </select>
 
               <label>Novedad</label>
@@ -628,7 +854,7 @@ let minutas = await db.collection("minutas").find().toArray();
           <h2>Historial de minutas</h2>
           ${historial || "<p>No hay minutas guardadas todavía.</p>"}
 
-          <a class="cerrar" href="/logout">Cerrar sesión</a>
+          <a class="cerrar no-print" href="/logout">Cerrar sesión</a>
         </div>
       </body>
       </html>
