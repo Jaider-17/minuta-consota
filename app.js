@@ -474,9 +474,20 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-        const minuta = {
-          fecha: new Date().toLocaleString("es-CO"),
-          fechaFiltro: new Date().toISOString().slice(0, 10),
+const ahora = new Date();
+
+const fecha = ahora.toLocaleDateString("es-CO");
+const hora = ahora.toLocaleTimeString("es-CO", {
+  hour: "2-digit",
+  minute: "2-digit",
+  second: "2-digit"
+});
+
+const minuta = {
+  fecha,
+  hora,
+  fechaFiltro: ahora.toISOString().slice(0, 10),
+
           usuario: sesion.usuario,
           gestor: sesion.nombre,
           puesto: req.body.puesto,
@@ -685,6 +696,14 @@ const server = http.createServer(async (req, res) => {
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
     const totalMinutas = minutas.length;
+const mesActual = new Date().toISOString().slice(0, 7);
+
+const minutasMes = minutas.filter(m => 
+  m.fechaFiltro && m.fechaFiltro.startsWith(mesActual)
+).length;
+
+const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
+
     const hoy = new Date().toISOString().slice(0, 10);
     const minutasHoy = minutas.filter(m => m.fechaFiltro === hoy).length;
 
@@ -703,7 +722,7 @@ const server = http.createServer(async (req, res) => {
 
       return `
         <div class="card ${alerta.clase}">
-          <div class="fecha">${m.fecha}</div>
+         <div class="fecha">${m.fecha} - ${m.hora || ""}</div>
           <h3>${m.puesto}</h3>
           ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
           <p><b>Gestor:</b> ${m.gestor}</p>
