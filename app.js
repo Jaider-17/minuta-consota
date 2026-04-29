@@ -495,15 +495,15 @@ const fechaFiltro = ahora.toLocaleDateString("en-CA", {
 const minuta = {
   fecha,
   hora,
-  fechaFiltro: ahora.toISOString().slice(0, 10),
-
-          usuario: sesion.usuario,
-          gestor: sesion.nombre,
-          puesto: req.body.puesto,
-          tipo: req.body.tipo,
-          novedad: req.body.novedad,
-          foto: fotoUrl
-        };
+  fechaFiltro,
+  usuario: sesion.usuario,
+  gestor: sesion.nombre,
+  puesto: req.body.puesto,
+  tipo: req.body.tipo,
+  novedad: req.body.novedad,
+  estado: "Pendiente",
+  foto: fotoUrl
+};
 
         await db.collection("minutas").insertOne(minuta);
 
@@ -736,6 +736,7 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
           ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
           <p><b>Gestor:</b> ${m.gestor}</p>
           <p><b>Tipo:</b> ${m.tipo}</p>
+<p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
           <p><b>Novedad:</b> ${m.novedad}</p>
           ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
 
