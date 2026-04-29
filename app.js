@@ -608,6 +608,36 @@ if (req.method === "POST" && req.url === "/cerrar-turno") {
     return;
   }
 
+  const turnoActivo = await db.collection("turnos").findOne({
+    usuario: sesion.usuario,
+    estado: "Activo"
+  });
+
+  if (!turnoActivo) {
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+    return;
+  }
+
+  const { fecha, hora, fechaFiltro } = fechaColombia();
+
+  await db.collection("turnos").updateOne(
+    { _id: turnoActivo._id },
+    {
+      $set: {
+        fechaSalida: fecha,
+        fechaSalidaFiltro: fechaFiltro,
+        horaSalida: hora,
+        estado: "Cerrado"
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
   const { fecha, hora, fechaFiltro } = fechaColombia();
 
   const turnoActivo = await db.collection("turnos").findOne({
