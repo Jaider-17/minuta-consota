@@ -115,6 +115,31 @@ function fechaColombia() {
   return { fecha, hora, fechaFiltro, mesFiltro };
 }
 
+function proximosDiasColombia(cantidad = 15) {
+  const dias = [];
+  const hoy = new Date(new Date().toLocaleString("en-US", { timeZone: "America/Bogota" }));
+
+  for (let i = 0; i < cantidad; i++) {
+    const d = new Date(hoy);
+    d.setDate(hoy.getDate() + i);
+
+    const fecha = d.toLocaleDateString("en-CA", {
+      timeZone: "America/Bogota"
+    });
+
+    const nombreDia = d.toLocaleDateString("es-CO", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      timeZone: "America/Bogota"
+    });
+
+    dias.push({ fecha, nombreDia });
+  }
+
+  return dias;
+}
+
 function obtenerTipoTurno() {
   const hora = new Date().toLocaleString("es-CO", {
     timeZone: "America/Bogota",
@@ -896,6 +921,53 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
       return;
     }
 
+if (accion === "actualizar_asignacion") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const id = form.get("id");
+  const usuario = form.get("usuario");
+  const puesto = form.get("puesto");
+  const fecha = form.get("fecha");
+  const horaInicioProgramada = form.get("horaInicioProgramada");
+  const horaFinProgramada = form.get("horaFinProgramada");
+  const tipoDia = form.get("tipoDia") || "Turno";
+  const motivo = form.get("motivo") || "Actualización de asignación";
+  const emergencia = form.get("emergencia") === "si";
+
+  if (!usuarios[usuario] || usuarios[usuario].rol !== "gestor") {
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+    return;
+  }
+
+  await db.collection("asignaciones").updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        usuario,
+        gestor: usuarios[usuario].nombre,
+        puesto,
+        fecha,
+        horaInicioProgramada,
+        horaFinProgramada,
+        tipoDia,
+        motivo,
+        esEmergencia: emergencia,
+        actualizadoPor: sesion.nombre,
+        actualizadoEn: new Date()
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
     if (accion === "eliminar") {
       if (!sesion || sesion.rol !== "supervisor") {
         res.writeHead(302, { Location: "/" });
@@ -957,6 +1029,94 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
     res.end();
     return;
   }
+
+if (req.url.startsWith("/editar-asignacion")) {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const id = url.searchParams.get("id");
+
+  const asignacion = await db.collection("asignaciones").findOne({
+    _id: new ObjectId(id)
+  });
+
+  if (!asignacion) {
+    enviarHTML(res, `<h1>Asignación no encontrada</h1><a href="/app">Volver</a>`);
+    return;
+  }
+
+  enviarHTML(res, `
+    <html>
+    <head>
+      <title>Editar asignación</title>
+      ${estilos}
+    </head>
+    <body>
+      <header>
+        <div class="logo">CF</div>
+        <h1>Editar asignación</h1>
+      </header>
+
+      <div class="contenedor">
+        <form method="POST">
+          <input type="hidden" name="accion" value="actualizar_asignacion">
+          <input type="hidden" name="id" value="${id}">
+
+          <label>Gestor</label>
+          <select name="usuario" required>
+            ${Object.entries(usuarios)
+              .filter(([usuario, datos]) => datos.rol === "gestor")
+              .map(([usuario, datos]) => `
+                <option value="${usuario}" ${opcionSeleccionada(usuario, asignacion.usuario)}>
+                  ${datos.nombre}
+                </option>
+              `).join("")}
+          </select>
+
+          <label>Puesto</label>
+          <select name="puesto" required>
+            ${puestos.map(p => `<option value="${p}" ${opcionSeleccionada(p, asignacion.puesto)}>${p}</option>`).join("")}
+          </select>
+
+          <label>Fecha</label>
+          <input type="date" name="fecha" value="${asignacion.fecha || ""}" required>
+
+          <label>Hora inicio programada</label>
+          <input type="time" name="horaInicioProgramada" value="${asignacion.horaInicioProgramada || ""}" required>
+
+          <label>Hora fin programada</label>
+          <input type="time" name="horaFinProgramada" value="${asignacion.horaFinProgramada || ""}" required>
+
+          <label>Tipo de día</label>
+          <select name="tipoDia">
+            <option value="Turno" ${opcionSeleccionada("Turno", asignacion.tipoDia)}>Turno</option>
+            <option value="Descanso" ${opcionSeleccionada("Descanso", asignacion.tipoDia)}>Descanso</option>
+            <option value="Disponible" ${opcionSeleccionada("Disponible", asignacion.tipoDia)}>Disponible</option>
+          </select>
+
+          <label>Motivo</label>
+          <input name="motivo" value="${asignacion.motivo || ""}" required>
+
+          <label>¿Cambio de emergencia?</label>
+          <select name="emergencia">
+            <option value="no" ${!asignacion.esEmergencia ? "selected" : ""}>No</option>
+            <option value="si" ${asignacion.esEmergencia ? "selected" : ""}>Sí</option>
+          </select>
+
+          <button type="submit">Guardar cambios</button>
+        </form>
+
+        <a href="/app">Volver</a>
+      </div>
+    </body>
+    </html>
+  `);
+  return;
+}
 
   if (req.url.startsWith("/editar")) {
     if (!sesion || sesion.rol !== "supervisor") {
@@ -1063,6 +1223,14 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
     const asignacionesHoy = await db.collection("asignaciones")
       .find({ fecha: hoyAsignacion })
       .toArray();
+
+const diasProgramacion = proximosDiasColombia(15);
+const fechasProgramacion = diasProgramacion.map(d => d.fecha);
+
+const asignaciones15Dias = await db.collection("asignaciones")
+  .find({ fecha: { $in: fechasProgramacion } })
+  .sort({ fecha: 1, gestor: 1 })
+  .toArray();
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
@@ -1182,65 +1350,96 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
     `;
 
     const formularioAsignacion = `
-      <div class="panel">
-        <h2>📅 Asignar puesto</h2>
+  <div class="panel">
+    <h2>📅 Programación avanzada de puestos</h2>
+    <p>Desde aquí puedes asignar turnos, descansos o disponibilidad para los próximos 15 días.</p>
 
-        <form method="POST">
-          <input type="hidden" name="accion" value="asignar">
+    <form method="POST">
+      <input type="hidden" name="accion" value="asignar">
 
-          <label>Gestor</label>
-          <select name="usuario" required>
-            ${Object.entries(usuarios)
-              .filter(([usuario, datos]) => datos.rol === "gestor")
-              .map(([usuario, datos]) => `<option value="${usuario}">${datos.nombre}</option>`)
-              .join("")}
-          </select>
+      <label>Gestor</label>
+      <select name="usuario" required>
+        ${Object.entries(usuarios)
+          .filter(([usuario, datos]) => datos.rol === "gestor")
+          .map(([usuario, datos]) => `<option value="${usuario}">${datos.nombre}</option>`)
+          .join("")}
+      </select>
 
-          <label>Puesto</label>
-          <select name="puesto" required>
-            ${puestos.map(p => `<option>${p}</option>`).join("")}
-          </select>
+      <label>Puesto</label>
+      <select name="puesto" required>
+        ${puestos.map(p => `<option>${p}</option>`).join("")}
+      </select>
 
-          <label>Fecha</label>
-          <input type="date" name="fecha" value="${hoyAsignacion}" required>
+      <label>Fecha</label>
+      <input type="date" name="fecha" value="${hoyAsignacion}" required>
 
-<label>Hora inicio programada</label>
-<input type="time" name="horaInicioProgramada" required>
+      <label>Hora inicio programada</label>
+      <input type="time" name="horaInicioProgramada" required>
 
-<label>Hora fin programada</label>
-<input type="time" name="horaFinProgramada" required>
+      <label>Hora fin programada</label>
+      <input type="time" name="horaFinProgramada" required>
 
+      <label>Tipo de día</label>
+      <select name="tipoDia">
+        <option value="Turno">Turno</option>
+        <option value="Descanso">Descanso</option>
+        <option value="Disponible">Disponible</option>
+      </select>
 
-<label>Motivo</label>
-<input name="motivo" placeholder="Ej: turno normal, cambio por incapacidad..." required>
+      <label>Motivo</label>
+      <input name="motivo" placeholder="Ej: turno normal, descanso, cambio por emergencia..." required>
 
-<label>¿Cambio de emergencia?</label>
-<select name="emergencia">
-  <option value="no">No</option>
-  <option value="si">Sí</option>
-</select>
+      <label>¿Cambio de emergencia?</label>
+      <select name="emergencia">
+        <option value="no">No</option>
+        <option value="si">Sí</option>
+      </select>
 
-          <button type="submit">Guardar asignación</button>
-        </form>
+      <button type="submit">💾 Guardar asignación</button>
+    </form>
 
-        <h3>Asignaciones de hoy</h3>
-        ${
-          asignacionesHoy.length === 0
-            ? "<p>No hay asignaciones para hoy.</p>"
-            : asignacionesHoy.map(a => `
-              <div class="turno-card">
-                <p><b>${a.gestor}</b></p>
-                <p><b>Puesto:</b> ${a.puesto}</p>
-         <p><b>Fecha:</b> ${a.fecha}</p>
-<p><b>Horario:</b> ${a.horaInicioProgramada || "No definida"} - ${a.horaFinProgramada || "No definida"}</p>
-<p><b>Motivo:</b> ${a.motivo || "Sin motivo"}</p>
-<p><b>Tipo:</b> ${a.esEmergencia ? "🚨 Emergencia" : "Normal"}</p>
-<p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
-              </div>
-            `).join("")
-        }
-      </div>
-    `;
+    <h3>🗓️ Calendario próximos 15 días</h3>
+
+    ${
+      diasProgramacion.map(dia => {
+        const asignacionesDia = asignaciones15Dias.filter(a => a.fecha === dia.fecha);
+
+        return `
+          <div class="card">
+            <h3>${dia.nombreDia}</h3>
+            <p class="fecha">${dia.fecha}</p>
+
+            ${
+              asignacionesDia.length === 0
+                ? "<p>No hay programación para este día.</p>"
+                : asignacionesDia.map(a => `
+                  <div class="turno-card">
+                    <p><b>${a.gestor}</b></p>
+                    <p><b>Puesto:</b> ${a.puesto || ""}</p>
+                    <p><b>Horario:</b> ${a.horaInicioProgramada || "No definido"} - ${a.horaFinProgramada || "No definido"}</p>
+                    <p><b>Tipo de día:</b> ${a.tipoDia || "Turno"}</p>
+                    <p><b>Motivo:</b> ${a.motivo || "Sin motivo"}</p>
+                    <p><b>Emergencia:</b> ${a.esEmergencia ? "🚨 Sí" : "No"}</p>
+                    <p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
+
+                    <div class="botones no-print" style="margin-top:10px;">
+                      <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️ Editar</a>
+
+                      <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta asignación?');" style="box-shadow:none;padding:0;margin:0;">
+                        <input type="hidden" name="accion" value="eliminar_asignacion">
+                        <input type="hidden" name="id" value="${a._id}">
+                        <button class="btn-danger" type="submit">🗑️ Eliminar</button>
+                      </form>
+                    </div>
+                  </div>
+                `).join("")
+            }
+          </div>
+        `;
+      }).join("")
+    }
+  </div>
+`;
 
     const dashboardSupervisor = `
       <div class="panel">
