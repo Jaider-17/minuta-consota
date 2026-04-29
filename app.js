@@ -145,6 +145,60 @@ function calcularTiempoTrabajado(inicio, fin) {
   };
 }
 
+function combinarFechaHoraColombia(fecha, hora) {
+  return new Date(`${fecha}T${hora}:00-05:00`);
+}
+
+function analizarCumplimientoHorario(asignacion, entradaReal, salidaReal) {
+  if (!asignacion || !asignacion.horaInicioProgramada || !asignacion.horaFinProgramada) {
+    return {
+      estadoCumplimiento: "Sin horario programado",
+      minutosTarde: 0,
+      minutosSalidaTemprano: 0,
+      minutosExtra: 0,
+      resumenCumplimiento: "No hay horario programado para comparar."
+    };
+  }
+
+  const inicioProgramado = combinarFechaHoraColombia(asignacion.fecha, asignacion.horaInicioProgramada);
+
+  let fechaFinProgramada = asignacion.fecha;
+
+  if (asignacion.horaFinProgramada <= asignacion.horaInicioProgramada) {
+    const fechaTemp = new Date(`${asignacion.fecha}T00:00:00-05:00`);
+    fechaTemp.setDate(fechaTemp.getDate() + 1);
+    fechaFinProgramada = fechaTemp.toISOString().slice(0, 10);
+  }
+
+  const finProgramado = combinarFechaHoraColombia(fechaFinProgramada, asignacion.horaFinProgramada);
+
+  const minutosTarde = Math.max(0, Math.floor((entradaReal - inicioProgramado) / 60000));
+  const minutosSalidaTemprano = Math.max(0, Math.floor((finProgramado - salidaReal) / 60000));
+  const minutosExtra = Math.max(0, Math.floor((salidaReal - finProgramado) / 60000));
+
+  let estadoCumplimiento = "Cumplió horario ✅";
+
+  if (minutosTarde > 0 && minutosSalidaTemprano > 0) {
+    estadoCumplimiento = "Llegó tarde y salió antes ⚠️";
+  } else if (minutosTarde > 0) {
+    estadoCumplimiento = "Llegó tarde ⏰";
+  } else if (minutosSalidaTemprano > 0) {
+    estadoCumplimiento = "Salió antes ⚠️";
+  } else if (minutosExtra > 0) {
+    estadoCumplimiento = "Hizo tiempo extra 💰";
+  }
+
+  const resumenCumplimiento = `Tarde: ${minutosTarde} min | Salida antes: ${minutosSalidaTemprano} min | Extra: ${minutosExtra} min`;
+
+  return {
+    estadoCumplimiento,
+    minutosTarde,
+    minutosSalidaTemprano,
+    minutosExtra,
+    resumenCumplimiento
+  };
+}
+
 function novadadSeguro(texto = "") {
   return String(texto || "").toLowerCase();
 }
@@ -620,7 +674,7 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const turno = {
+const turno = {
   gestor: sesion.nombre,
   usuario: sesion.usuario,
   puesto,
@@ -628,7 +682,6 @@ const server = http.createServer(async (req, res) => {
   fechaFiltro,
   horaEntrada: hora,
   tipoTurno: obtenerTipoTurno(),
-tipoTurno: obtenerTipoTurno(),
   estado: "Activo",
   creadoEn: new Date()
 };
@@ -665,22 +718,36 @@ tipoTurno: obtenerTipoTurno(),
     const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
     const salida = new Date();
     const tiempo = calcularTiempoTrabajado(entrada, salida);
+const asignacionTurno = await db.collection("asignaciones").findOne({
+  usuario: sesion.usuario,
+  fecha: turnoActivo.fechaFiltro
+});
 
-    await db.collection("turnos").updateOne(
-      { _id: turnoActivo._id },
-      {
-        $set: {
-          fechaSalida: fecha,
-          fechaSalidaFiltro: fechaFiltro,
-          horaSalida: hora,
-          estado: "Cerrado",
-          cerradoEn: salida,
-          minutosTrabajados: tiempo.minutosTrabajados,
-          horasTrabajadas: tiempo.horasTrabajadas,
-          tiempoTrabajado: tiempo.textoTrabajado
-        }
-      }
-    );
+const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salida);
+
+   await db.collection("turnos").updateOne(
+  { _id: turnoActivo._id },
+  {
+    $set: {
+      fechaSalida: fecha,
+      fechaSalidaFiltro: fechaFiltro,
+      horaSalida: hora,
+      estado: "Cerrado",
+      cerradoEn: salida,
+      minutosTrabajados: tiempo.minutosTrabajados,
+      horasTrabajadas: tiempo.horasTrabajadas,
+      tiempoTrabajado: tiempo.textoTrabajado,
+      estadoCumplimiento: cumplimiento.estadoCumplimiento,
+      minutosTarde: cumplimiento.minutosTarde,
+      minutosSalidaTemprano: cumplimiento.minutosSalidaTemprano,
+      minutosExtra: cumplimiento.minutosExtra,
+      resumenCumplimiento: cumplimiento.resumenCumplimiento,
+      horarioProgramado: asignacionTurno
+        ? `${asignacionTurno.horaInicioProgramada || ""} - ${asignacionTurno.horaFinProgramada || ""}`
+        : "Sin horario"
+    }
+  }
+);
 
     res.writeHead(302, { Location: "/app" });
     res.end();
@@ -688,173 +755,197 @@ tipoTurno: obtenerTipoTurno(),
   }
 
   if (req.method === "POST") {
-    let datos = "";
+  let datos = "";
 
-    req.on("data", parte => datos += parte);
+  req.on("data", parte => datos += parte);
 
-    req.on("end", async () => {
-      const form = new URLSearchParams(datos);
-      const accion = form.get("accion");
+  req.on("end", async () => {
+    const form = new URLSearchParams(datos);
+    const accion = form.get("accion");
 
-      if (accion === "login") {
-        const usuario = (form.get("usuario") || "").toLowerCase();
-        const clave = form.get("clave");
+    if (accion === "login") {
+      const usuario = (form.get("usuario") || "").toLowerCase();
+      const clave = form.get("clave");
 
-        if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
-          enviarHTML(res, `
-            <html>
-            <head>${estilos}</head>
-            <body class="login-body">
-              <div class="login-card">
-                <div class="logo">CF</div>
-                <h1 class="marca">Datos incorrectos ❌</h1>
-                <p>Usuario o clave incorrecta.</p>
-                <a href="/">Volver</a>
-              </div>
-            </body>
-            </html>
-          `);
-          return;
-        }
+      if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
+        enviarHTML(res, `
+          <html>
+          <head>${estilos}</head>
+          <body class="login-body">
+            <div class="login-card">
+              <div class="logo">CF</div>
+              <h1 class="marca">Datos incorrectos ❌</h1>
+              <p>Usuario o clave incorrecta.</p>
+              <a href="/">Volver</a>
+            </div>
+          </body>
+          </html>
+        `);
+        return;
+      }
 
-        const id = crypto.randomBytes(16).toString("hex");
+      const id = crypto.randomBytes(16).toString("hex");
 
-        sesiones[id] = {
-          usuario,
-          nombre: usuarios[usuario].nombre,
-          rol: usuarios[usuario].rol
-        };
+      sesiones[id] = {
+        usuario,
+        nombre: usuarios[usuario].nombre,
+        rol: usuarios[usuario].rol
+      };
 
-        res.writeHead(302, {
-          "Set-Cookie": `sessionId=${id}; HttpOnly; Path=/`,
-          Location: "/app"
-        });
+      res.writeHead(302, {
+        "Set-Cookie": `sessionId=${id}; HttpOnly; Path=/`,
+        Location: "/app"
+      });
+      res.end();
+      return;
+    }
+
+    if (accion === "revisada") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
         res.end();
         return;
       }
 
-      if (accion === "revisada") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+      const id = form.get("id");
 
-        const id = form.get("id");
-
-        await db.collection("minutas").updateOne(
-          { _id: new ObjectId(id) },
-          {
-            $set: {
-              estado: "Revisada",
-              revisadaPor: sesion.nombre,
-              revisadaEn: new Date()
-            }
+      await db.collection("minutas").updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            estado: "Revisada",
+            revisadaPor: sesion.nombre,
+            revisadaEn: new Date()
           }
-        );
+        }
+      );
 
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    if (accion === "asignar") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
+        res.end();
+        return;
+      }
+
+      const usuario = form.get("usuario");
+      const puesto = form.get("puesto");
+      const fecha = form.get("fecha");
+      const horaInicioProgramada = form.get("horaInicioProgramada");
+      const horaFinProgramada = form.get("horaFinProgramada");
+      const tipoDia = form.get("tipoDia") || "Turno";
+      const motivo = form.get("motivo") || "Asignación normal";
+      const emergencia = form.get("emergencia") === "si";
+
+      if (!usuarios[usuario] || usuarios[usuario].rol !== "gestor") {
         res.writeHead(302, { Location: "/app" });
         res.end();
         return;
       }
 
-      if (accion === "asignar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+      const gestor = usuarios[usuario].nombre;
 
-        const usuario = form.get("usuario");
-const puesto = form.get("puesto");
-const fecha = form.get("fecha");
-const horaInicioProgramada = form.get("horaInicioProgramada");
-const horaFinProgramada = form.get("horaFinProgramada");
-const motivo = form.get("motivo") || "Asignación normal";
-const emergencia = form.get("emergencia") === "si";
-
-        if (!usuarios[usuario] || usuarios[usuario].rol !== "gestor") {
-          res.writeHead(302, { Location: "/app" });
-          res.end();
-          return;
-        }
-
-        const gestor = usuarios[usuario].nombre;
-
-        await db.collection("asignaciones").updateOne(
-          { usuario, fecha },
-          {
-        $set: {
-  gestor,
-  usuario,
-  puesto,
-  fecha,
-  horaInicioProgramada,
-  horaFinProgramada,
-  motivo,
-  esEmergencia: emergencia,
-  actualizadoPor: sesion.nombre,
-  actualizadoEn: new Date()
-},
-            $setOnInsert: {
-              creadoPor: sesion.nombre,
-              creadoEn: new Date()
-            }
+      await db.collection("asignaciones").updateOne(
+        { usuario, fecha },
+        {
+          $set: {
+            gestor,
+            usuario,
+            puesto,
+            fecha,
+            horaInicioProgramada,
+            horaFinProgramada,
+            tipoDia,
+            motivo,
+            esEmergencia: emergencia,
+            actualizadoPor: sesion.nombre,
+            actualizadoEn: new Date()
           },
-          { upsert: true }
-        );
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
-
-      if (accion === "eliminar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
-
-        const id = form.get("id");
-
-        await db.collection("minutas").deleteOne({
-          _id: new ObjectId(id)
-        });
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
-
-      if (accion === "actualizar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
-
-        const id = form.get("id");
-
-        await db.collection("minutas").updateOne(
-          { _id: new ObjectId(id) },
-          {
-            $set: {
-              puesto: form.get("puesto"),
-              tipo: form.get("tipo"),
-              novedad: form.get("novedad")
-            }
+          $setOnInsert: {
+            creadoPor: sesion.nombre,
+            creadoEn: new Date()
           }
-        );
+        },
+        { upsert: true }
+      );
 
-        res.writeHead(302, { Location: "/app" });
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    if (accion === "eliminar_asignacion") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
         res.end();
         return;
       }
-    });
 
-    return;
-  }
+      const id = form.get("id");
+
+      await db.collection("asignaciones").deleteOne({
+        _id: new ObjectId(id)
+      });
+
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    if (accion === "eliminar") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
+        res.end();
+        return;
+      }
+
+      const id = form.get("id");
+
+      await db.collection("minutas").deleteOne({
+        _id: new ObjectId(id)
+      });
+
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    if (accion === "actualizar") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
+        res.end();
+        return;
+      }
+
+      const id = form.get("id");
+
+      await db.collection("minutas").updateOne(
+        { _id: new ObjectId(id) },
+        {
+          $set: {
+            puesto: form.get("puesto"),
+            tipo: form.get("tipo"),
+            novedad: form.get("novedad")
+          }
+        }
+      );
+
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+  });
+
+  return;
+}
+
 
   if (req.url === "/logout") {
     if (sessionId) delete sesiones[sessionId];
@@ -1221,6 +1312,10 @@ const emergencia = form.get("emergencia") === "si";
                 <p><b>Entrada:</b> ${t.fecha || ""} - ${t.horaEntrada || ""}</p>
                 <p><b>Salida:</b> ${t.fechaSalida || ""} - ${t.horaSalida || ""}</p>
                 <p><b>Tiempo trabajado:</b> ${t.tiempoTrabajado || `${t.horasTrabajadas || 0} horas`}</p>
+<p><b>Horario programado:</b> ${t.horarioProgramado || "Sin horario"}</p>
+<p><b>Cumplimiento:</b> ${t.estadoCumplimiento || "No analizado"}</p>
+<p><b>Detalle:</b> ${t.resumenCumplimiento || ""}</p>
+
                 <p><b>Estado:</b> ${t.estado}</p>
               </div>
             `).join("")
