@@ -92,11 +92,6 @@ function opcionSeleccionada(valor, actual) {
 }
 
 function fechaColombia() {
-function calcularHoras(inicio, fin) {
-  const diferenciaMs = fin - inicio;
-  const horas = diferenciaMs / (1000 * 60 * 60);
-  return Number(horas.toFixed(2));
-}
   const ahora = new Date();
 
   const fecha = ahora.toLocaleDateString("es-CO", {
@@ -120,6 +115,24 @@ function calcularHoras(inicio, fin) {
   return { fecha, hora, fechaFiltro, mesFiltro };
 }
 
+function calcularTiempoTrabajado(inicio, fin) {
+  const diferenciaMs = fin - inicio;
+  const minutosTotales = Math.max(0, Math.floor(diferenciaMs / (1000 * 60)));
+  const horas = Math.floor(minutosTotales / 60);
+  const minutos = minutosTotales % 60;
+  const horasDecimal = Number((minutosTotales / 60).toFixed(2));
+
+  return {
+    minutosTrabajados: minutosTotales,
+    horasTrabajadas: horasDecimal,
+    textoTrabajado: `${horas} hora(s) y ${minutos} minuto(s)`
+  };
+}
+
+function novadadSeguro(texto = "") {
+  return String(texto || "").toLowerCase();
+}
+
 function detectarAlerta(novedad = "") {
   const texto = novadadSeguro(novedad);
 
@@ -141,10 +154,6 @@ function detectarAlerta(novedad = "") {
   }
 
   return { clase: "", etiqueta: "" };
-}
-
-function novadadSeguro(texto = "") {
-  return String(texto || "").toLowerCase();
 }
 
 async function obtenerMinutasFiltradas(url, sesion) {
@@ -287,6 +296,14 @@ const estilos = `
 
   .btn-warning:hover { background: #d9a51e; }
 
+  .btn-success {
+    background: #16a34a;
+  }
+
+  .btn-success:hover {
+    background: #15803d;
+  }
+
   .card { border-left: 6px solid #005baa; }
 
   .fecha {
@@ -330,7 +347,7 @@ const estilos = `
     flex-wrap: wrap;
   }
 
-  .botones a, .botones button {
+  .botones a, .botones button, .botones form {
     flex: 1;
   }
 
@@ -372,6 +389,11 @@ const estilos = `
 
   .estado-activo {
     color: #16a34a;
+    font-weight: bold;
+  }
+
+  .estado-revisada {
+    color: #2563eb;
     font-weight: bold;
   }
 
@@ -582,16 +604,16 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-   const turno = {
-  gestor: sesion.nombre,
-  usuario: sesion.usuario,
-  puesto,
-  fecha,
-  fechaFiltro,
-  horaEntrada: hora,
-  estado: "Activo",
-  creadoEn: new Date()
-};
+      const turno = {
+        gestor: sesion.nombre,
+        usuario: sesion.usuario,
+        puesto,
+        fecha,
+        fechaFiltro,
+        horaEntrada: hora,
+        estado: "Activo",
+        creadoEn: new Date()
+      };
 
       await db.collection("turnos").insertOne(turno);
 
@@ -601,78 +623,51 @@ const server = http.createServer(async (req, res) => {
 
     return;
   }
-if (req.method === "POST" && req.url === "/cerrar-turno") {
-  if (!sesion || sesion.rol !== "gestor") {
-    res.writeHead(302, { Location: "/" });
-    res.end();
-    return;
-  }
 
-  const turnoActivo = await db.collection("turnos").findOne({
-    usuario: sesion.usuario,
-    estado: "Activo"
-  });
+  if (req.method === "POST" && req.url === "/cerrar-turno") {
+    if (!sesion || sesion.rol !== "gestor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
 
-  if (!turnoActivo) {
+    const turnoActivo = await db.collection("turnos").findOne({
+      usuario: sesion.usuario,
+      estado: "Activo"
+    });
+
+    if (!turnoActivo) {
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    const { fecha, hora, fechaFiltro } = fechaColombia();
+
+    const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
+    const salida = new Date();
+    const tiempo = calcularTiempoTrabajado(entrada, salida);
+
+    await db.collection("turnos").updateOne(
+      { _id: turnoActivo._id },
+      {
+        $set: {
+          fechaSalida: fecha,
+          fechaSalidaFiltro: fechaFiltro,
+          horaSalida: hora,
+          estado: "Cerrado",
+          cerradoEn: salida,
+          minutosTrabajados: tiempo.minutosTrabajados,
+          horasTrabajadas: tiempo.horasTrabajadas,
+          tiempoTrabajado: tiempo.textoTrabajado
+        }
+      }
+    );
+
     res.writeHead(302, { Location: "/app" });
     res.end();
     return;
   }
-
-  const { fecha, hora, fechaFiltro } = fechaColombia();
-
-  await db.collection("turnos").updateOne(
-    { _id: turnoActivo._id },
-    {
-      $set: {
-        fechaSalida: fecha,
-        fechaSalidaFiltro: fechaFiltro,
-        horaSalida: hora,
-        estado: "Cerrado"
-      }
-    }
-  );
-
-  res.writeHead(302, { Location: "/app" });
-  res.end();
-  return;
-}
-
-  const { fecha, hora, fechaFiltro } = fechaColombia();
-
-  const turnoActivo = await db.collection("turnos").findOne({
-    usuario: sesion.usuario,
-    estado: "Activo"
-  });
-
-  if (!turnoActivo) {
-    res.writeHead(302, { Location: "/app" });
-    res.end();
-    return;
-  }
-
-  const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
-  const salida = new Date();
-  const horasTrabajadas = calcularHoras(entrada, salida);
-
-  await db.collection("turnos").updateOne(
-    { _id: turnoActivo._id },
-    {
-      $set: {
-        fechaSalida: fecha,
-        fechaSalidaFiltro: fechaFiltro,
-        horaSalida: hora,
-        estado: "Cerrado",
-        cerradoEn: salida,
-        horasTrabajadas
-      }
-    }
-  );
-
-  res.writeHead(302, { Location: "/app" });
-  res.end();
-  return;
-}
 
   if (req.method === "POST") {
     let datos = "";
@@ -720,28 +715,30 @@ if (req.method === "POST" && req.url === "/cerrar-turno") {
         return;
       }
 
-if (accion === "revisada") {
-  if (!sesion || sesion.rol !== "supervisor") {
-    res.writeHead(302, { Location: "/" });
-    res.end();
-    return;
-  }
+      if (accion === "revisada") {
+        if (!sesion || sesion.rol !== "supervisor") {
+          res.writeHead(302, { Location: "/" });
+          res.end();
+          return;
+        }
 
-  const id = form.get("id");
+        const id = form.get("id");
 
-  await db.collection("minutas").updateOne(
-    { _id: new ObjectId(id) },
-    {
-      $set: {
-        estado: "Revisada"
+        await db.collection("minutas").updateOne(
+          { _id: new ObjectId(id) },
+          {
+            $set: {
+              estado: "Revisada",
+              revisadaPor: sesion.nombre,
+              revisadaEn: new Date()
+            }
+          }
+        );
+
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+        return;
       }
-    }
-  );
-
-  res.writeHead(302, { Location: "/app" });
-  res.end();
-  return;
-}
 
       if (accion === "eliminar") {
         if (!sesion || sesion.rol !== "supervisor") {
@@ -884,11 +881,17 @@ if (accion === "revisada") {
     const turnosActivos = await db.collection("turnos")
       .find({ estado: "Activo" })
       .toArray();
-const miTurnoActivo = await db.collection("turnos").findOne({
-  usuario: sesion.usuario,
-  estado: "Activo"
-});
 
+    const turnosCerrados = await db.collection("turnos")
+      .find({ estado: "Cerrado" })
+      .sort({ cerradoEn: -1 })
+      .limit(20)
+      .toArray();
+
+    const miTurnoActivo = await db.collection("turnos").findOne({
+      usuario: sesion.usuario,
+      estado: "Activo"
+    });
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
@@ -914,8 +917,15 @@ const miTurnoActivo = await db.collection("turnos").findOne({
       porGestor[m.gestor] = (porGestor[m.gestor] || 0) + 1;
     });
 
+    const horasPorGestor = {};
+    turnosCerrados.forEach(t => {
+      horasPorGestor[t.gestor] = (horasPorGestor[t.gestor] || 0) + (t.horasTrabajadas || 0);
+    });
+
     const historial = [...minutas].reverse().map(m => {
       const alerta = detectarAlerta(m.novedad);
+      const estadoTexto = m.estado || "Pendiente";
+      const claseEstado = estadoTexto === "Revisada" ? "estado-revisada" : "";
 
       return `
         <div class="card ${alerta.clase}">
@@ -924,20 +934,22 @@ const miTurnoActivo = await db.collection("turnos").findOne({
           ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
           <p><b>Gestor:</b> ${m.gestor || ""}</p>
           <p><b>Tipo:</b> ${m.tipo || ""}</p>
-          <p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
+          <p><b>Estado:</b> <span class="${claseEstado}">${estadoTexto}</span></p>
+          ${m.revisadaPor ? `<p><b>Revisada por:</b> ${m.revisadaPor}</p>` : ""}
           <p><b>Novedad:</b> ${m.novedad || ""}</p>
           ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
 
           ${sesion.rol === "supervisor" ? `
             <div class="botones no-print" style="margin-top:10px;">
               <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
-${(m.estado || "Pendiente") === "Pendiente" ? `
-  <form method="POST" style="box-shadow:none;padding:0;margin:0;">
-    <input type="hidden" name="accion" value="revisada">
-    <input type="hidden" name="id" value="${m._id}">
-    <button type="submit">✅ Marcar revisada</button>
-  </form>
-` : ""}
+
+              ${(m.estado || "Pendiente") === "Pendiente" ? `
+                <form method="POST" style="box-shadow:none;padding:0;margin:0;">
+                  <input type="hidden" name="accion" value="revisada">
+                  <input type="hidden" name="id" value="${m._id}">
+                  <button class="btn-success" type="submit">✅ Marcar revisada</button>
+                </form>
+              ` : ""}
 
               <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
                 <input type="hidden" name="accion" value="eliminar">
@@ -1030,6 +1042,9 @@ ${(m.estado || "Pendiente") === "Pendiente" ? `
 
         <h3>Por gestor</h3>
         ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
+
+        <h3>Total de horas trabajadas por gestor</h3>
+        ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
       </div>
     `;
 
@@ -1052,58 +1067,79 @@ ${(m.estado || "Pendiente") === "Pendiente" ? `
       </div>
     `;
 
-  const formularioGestor = `
-  ${
-    miTurnoActivo
-      ? `
-        <div class="panel">
-          <h2>🟢 Turno activo</h2>
-          <p><b>Gestor:</b> ${miTurnoActivo.gestor}</p>
-          <p><b>Puesto:</b> ${miTurnoActivo.puesto}</p>
-          <p><b>Fecha:</b> ${miTurnoActivo.fecha || ""}</p>
-          <p><b>Hora entrada:</b> ${miTurnoActivo.horaEntrada || ""}</p>
-          <p><b>Estado:</b> <span class="estado-activo">${miTurnoActivo.estado}</span></p>
-<form method="POST" action="/cerrar-turno" onsubmit="return confirm('¿Seguro que deseas cerrar tu turno?');" style="box-shadow:none;padding:0;margin-top:10px;">
-  <button class="btn-danger" type="submit">🔴 Cerrar turno</button>
-</form>
-        </div>
-      `
-      : `
-        <form method="POST" action="/iniciar-turno">
-          <label>Iniciar turno</label>
+    const historialTurnosHTML = `
+      <div class="panel">
+        <h2>🕒 Historial de turnos cerrados</h2>
+        ${
+          turnosCerrados.length === 0
+            ? "<p>No hay turnos cerrados todavía.</p>"
+            : turnosCerrados.map(t => `
+              <div class="turno-card">
+                <p><b>${t.gestor}</b></p>
+                <p><b>Puesto:</b> ${t.puesto || ""}</p>
+                <p><b>Entrada:</b> ${t.fecha || ""} - ${t.horaEntrada || ""}</p>
+                <p><b>Salida:</b> ${t.fechaSalida || ""} - ${t.horaSalida || ""}</p>
+                <p><b>Tiempo trabajado:</b> ${t.tiempoTrabajado || `${t.horasTrabajadas || 0} horas`}</p>
+                <p><b>Estado:</b> ${t.estado}</p>
+              </div>
+            `).join("")
+        }
+      </div>
+    `;
 
-          <select name="puesto" required>
-            ${opcionesPuestos}
-          </select>
+    const formularioGestor = `
+      ${
+        miTurnoActivo
+          ? `
+            <div class="panel">
+              <h2>🟢 Turno activo</h2>
+              <p><b>Gestor:</b> ${miTurnoActivo.gestor}</p>
+              <p><b>Puesto:</b> ${miTurnoActivo.puesto}</p>
+              <p><b>Fecha:</b> ${miTurnoActivo.fecha || ""}</p>
+              <p><b>Hora entrada:</b> ${miTurnoActivo.horaEntrada || ""}</p>
+              <p><b>Estado:</b> <span class="estado-activo">${miTurnoActivo.estado}</span></p>
 
-          <button type="submit">🟢 Iniciar turno</button>
-        </form>
-      `
-  }
+              <form method="POST" action="/cerrar-turno" onsubmit="return confirm('¿Seguro que deseas cerrar tu turno?');" style="box-shadow:none;padding:0;margin-top:10px;">
+                <button class="btn-danger" type="submit">🔴 Cerrar turno</button>
+              </form>
+            </div>
+          `
+          : `
+            <form method="POST" action="/iniciar-turno">
+              <label>Iniciar turno</label>
 
-  <form method="POST" action="/guardar" enctype="multipart/form-data">
-    <label>Gestor</label>
-    <input value="${sesion.nombre}" readonly>
+              <select name="puesto" required>
+                ${opcionesPuestos}
+              </select>
 
-    <label>Puesto del turno</label>
-    <select name="puesto" required>
-      ${opcionesPuestos}
-    </select>
+              <button type="submit">🟢 Iniciar turno</button>
+            </form>
+          `
+      }
 
-    <label>Tipo de registro</label>
-    <select name="tipo" required>
-      ${tipos.map(t => `<option>${t}</option>`).join("")}
-    </select>
+      <form method="POST" action="/guardar" enctype="multipart/form-data">
+        <label>Gestor</label>
+        <input value="${sesion.nombre}" readonly>
 
-    <label>Novedad</label>
-    <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
+        <label>Puesto del turno</label>
+        <select name="puesto" required>
+          ${opcionesPuestos}
+        </select>
 
-    <label>Foto evidencia</label>
-    <input type="file" name="foto" accept="image/*" capture="environment">
+        <label>Tipo de registro</label>
+        <select name="tipo" required>
+          ${tipos.map(t => `<option>${t}</option>`).join("")}
+        </select>
 
-    <button type="submit">Guardar minuta</button>
-  </form>
-`;
+        <label>Novedad</label>
+        <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
+
+        <label>Foto evidencia</label>
+        <input type="file" name="foto" accept="image/*" capture="environment">
+
+        <button type="submit">Guardar minuta</button>
+      </form>
+    `;
 
     enviarHTML(res, `
       <html>
@@ -1121,7 +1157,7 @@ ${(m.estado || "Pendiente") === "Pendiente" ? `
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-          ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML : ""}
+          ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
