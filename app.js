@@ -1087,6 +1087,15 @@ const server = http.createServer(async (req, res) => {
           <label>Fecha</label>
           <input type="date" name="fecha" value="${hoyAsignacion}" required>
 
+<label>Motivo</label>
+<input name="motivo" placeholder="Ej: turno normal, cambio por incapacidad..." required>
+
+<label>¿Cambio de emergencia?</label>
+<select name="emergencia">
+  <option value="no">No</option>
+  <option value="si">Sí</option>
+</select>
+
           <button type="submit">Guardar asignación</button>
         </form>
 
@@ -1099,7 +1108,9 @@ const server = http.createServer(async (req, res) => {
                 <p><b>${a.gestor}</b></p>
                 <p><b>Puesto:</b> ${a.puesto}</p>
                 <p><b>Fecha:</b> ${a.fecha}</p>
-                <p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
+<p><b>Motivo:</b> ${a.motivo || "Sin motivo"}</p>
+<p><b>Tipo:</b> ${a.esEmergencia ? "🚨 Emergencia" : "Normal"}</p>
+<p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
               </div>
             `).join("")
         }
