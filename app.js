@@ -808,17 +808,28 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
       <div class="panel">
         <h2>📊 Dashboard Gerencial</h2>
 
-        <div class="dashboard">
-          <div class="metric">
-            <p>Total minutas</p>
-            <strong>${totalMinutas}</strong>
-          </div>
+       <div class="dashboard">
+  <div class="metric">
+    <p>Novedades hoy</p>
+    <strong>${minutasHoy}</strong>
+  </div>
 
-          <div class="metric">
-            <p>Minutas hoy</p>
-            <strong>${minutasHoy}</strong>
-          </div>
-        </div>
+  <div class="metric">
+    <p>Novedades del mes</p>
+    <strong>${minutasMes}</strong>
+  </div>
+
+  <div class="metric">
+    <p>Pendientes</p>
+    <strong>${pendientes}</strong>
+  </div>
+
+  <div class="metric">
+    <p>Total registros</p>
+    <strong>${totalMinutas}</strong>
+  </div>
+</div>
+
 
         <h3>Por puesto</h3>
         ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
