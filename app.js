@@ -722,6 +722,33 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
+if (accion === "asignar") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const usuario = form.get("usuario");
+  const puesto = form.get("puesto");
+  const fecha = form.get("fecha");
+
+  const gestor = usuarios[usuario].nombre;
+
+  await db.collection("asignaciones").insertOne({
+    gestor,
+    usuario,
+    puesto,
+    fecha,
+    creadoPor: sesion.nombre,
+    creadoEn: new Date()
+  });
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
         const id = form.get("id");
 
         await db.collection("minutas").updateOne(
@@ -1018,6 +1045,34 @@ const asignacionHoy = await db.collection("asignaciones").findOne({
       </form>
     `;
 
+const formularioAsignacion = `
+  <div class="panel">
+    <h2>📅 Asignar puesto</h2>
+
+    <form method="POST">
+      <input type="hidden" name="accion" value="asignar">
+
+      <label>Gestor</label>
+      <select name="usuario" required>
+        ${Object.entries(usuarios)
+          .filter(([usuario, datos]) => datos.rol === "gestor")
+          .map(([usuario, datos]) => `<option value="${usuario}">${datos.nombre}</option>`)
+          .join("")}
+      </select>
+
+      <label>Puesto</label>
+      <select name="puesto" required>
+        ${puestos.map(p => `<option>${p}</option>`).join("")}
+      </select>
+
+      <label>Fecha</label>
+      <input type="date" name="fecha" required>
+
+      <button type="submit">Guardar asignación</button>
+    </form>
+  </div>
+`;
+
     const dashboardSupervisor = `
       <div class="panel">
         <h2>📊 Dashboard Gerencial</h2>
@@ -1171,8 +1226,7 @@ const asignacionHTML = asignacionHoy ? `
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-          ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
-         ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
+${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}         ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
