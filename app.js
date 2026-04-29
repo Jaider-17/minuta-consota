@@ -783,6 +783,11 @@ const server = http.createServer(async (req, res) => {
     const turnosActivos = await db.collection("turnos")
       .find({ estado: "Activo" })
       .toArray();
+const miTurnoActivo = await db.collection("turnos").findOne({
+  usuario: sesion.usuario,
+  estado: "Activo"
+});
+
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
@@ -939,40 +944,55 @@ const server = http.createServer(async (req, res) => {
       </div>
     `;
 
-    const formularioGestor = `
-      <form method="POST" action="/iniciar-turno">
-        <label>Iniciar turno</label>
+  const formularioGestor = `
+  ${
+    miTurnoActivo
+      ? `
+        <div class="panel">
+          <h2>🟢 Turno activo</h2>
+          <p><b>Gestor:</b> ${miTurnoActivo.gestor}</p>
+          <p><b>Puesto:</b> ${miTurnoActivo.puesto}</p>
+          <p><b>Fecha:</b> ${miTurnoActivo.fecha || ""}</p>
+          <p><b>Hora entrada:</b> ${miTurnoActivo.horaEntrada || ""}</p>
+          <p><b>Estado:</b> <span class="estado-activo">${miTurnoActivo.estado}</span></p>
+        </div>
+      `
+      : `
+        <form method="POST" action="/iniciar-turno">
+          <label>Iniciar turno</label>
 
-        <select name="puesto" required>
-          ${opcionesPuestos}
-        </select>
+          <select name="puesto" required>
+            ${opcionesPuestos}
+          </select>
 
-        <button type="submit">🟢 Iniciar turno</button>
-      </form>
+          <button type="submit">🟢 Iniciar turno</button>
+        </form>
+      `
+  }
 
-      <form method="POST" action="/guardar" enctype="multipart/form-data">
-        <label>Gestor</label>
-        <input value="${sesion.nombre}" readonly>
+  <form method="POST" action="/guardar" enctype="multipart/form-data">
+    <label>Gestor</label>
+    <input value="${sesion.nombre}" readonly>
 
-        <label>Puesto del turno</label>
-        <select name="puesto" required>
-          ${opcionesPuestos}
-        </select>
+    <label>Puesto del turno</label>
+    <select name="puesto" required>
+      ${opcionesPuestos}
+    </select>
 
-        <label>Tipo de registro</label>
-        <select name="tipo" required>
-          ${tipos.map(t => `<option>${t}</option>`).join("")}
-        </select>
+    <label>Tipo de registro</label>
+    <select name="tipo" required>
+      ${tipos.map(t => `<option>${t}</option>`).join("")}
+    </select>
 
-        <label>Novedad</label>
-        <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
+    <label>Novedad</label>
+    <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
 
-        <label>Foto evidencia</label>
-        <input type="file" name="foto" accept="image/*" capture="environment">
+    <label>Foto evidencia</label>
+    <input type="file" name="foto" accept="image/*" capture="environment">
 
-        <button type="submit">Guardar minuta</button>
-      </form>
-    `;
+    <button type="submit">Guardar minuta</button>
+  </form>
+`;
 
     enviarHTML(res, `
       <html>
