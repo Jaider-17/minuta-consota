@@ -928,6 +928,7 @@ if (accion === "actualizar_asignacion") {
     return;
   }
 
+
   const id = form.get("id");
   const usuario = form.get("usuario");
   const puesto = form.get("puesto");
@@ -943,6 +944,7 @@ if (accion === "actualizar_asignacion") {
     res.end();
     return;
   }
+
 
   await db.collection("asignaciones").updateOne(
     { _id: new ObjectId(id) },
@@ -967,6 +969,146 @@ if (accion === "actualizar_asignacion") {
   res.end();
   return;
 }
+
+if (accion === "generar_rango") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const usuario = form.get("usuario");
+  const puesto = form.get("puesto");
+  const fechaInicio = form.get("fechaInicio");
+  const fechaFin = form.get("fechaFin");
+  const motivo = form.get("motivo") || "Programación por rango";
+
+  if (!usuario || !fechaInicio || !fechaFin) {
+    res.writeHead(302, { Location: "/programar-rango" });
+    res.end();
+    return;
+  }
+
+  const dias = [];
+  const inicio = new Date(fechaInicio + "T00:00:00");
+  const fin = new Date(fechaFin + "T00:00:00");
+
+  while (inicio <= fin) {
+    const fecha = inicio.toISOString().slice(0, 10);
+    dias.push(fecha);
+    inicio.setDate(inicio.getDate() + 1);
+  }
+
+  const gestor = usuarios[usuario].nombre;
+
+  enviarHTML(res, `
+    <html>
+    <head>
+      <title>Editar programación</title>
+      ${estilos}
+    </head>
+    <body>
+      <header>
+        <div class="logo">CF</div>
+        <h1>🛠️ Configurar días</h1>
+      </header>
+
+      <div class="contenedor">
+        <form method="POST">
+          <input type="hidden" name="accion" value="guardar_rango">
+          <input type="hidden" name="usuario" value="${usuario}">
+          <input type="hidden" name="puesto" value="${puesto}">
+          <input type="hidden" name="motivo" value="${motivo}">
+
+          ${
+            dias.map((fecha, i) => `
+              <div class="card">
+                <h3>${fecha}</h3>
+
+                <label>Tipo de día</label>
+                <select name="tipoDia_${i}">
+                  <option value="Turno">Turno</option>
+                  <option value="Descanso">Descanso</option>
+                  <option value="Disponible">Disponible</option>
+                </select>
+
+                <label>Hora inicio</label>
+                <input type="time" name="inicio_${i}">
+
+                <label>Hora fin</label>
+                <input type="time" name="fin_${i}">
+
+                <input type="hidden" name="fecha_${i}" value="${fecha}">
+              </div>
+            `).join("")
+          }
+
+          <input type="hidden" name="totalDias" value="${dias.length}">
+
+          <button type="submit">💾 Guardar programación completa</button>
+        </form>
+
+        <a href="/app">⬅ Volver</a>
+      </div>
+    </body>
+    </html>
+  `);
+
+  return;
+}
+
+if (accion === "guardar_rango") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const usuario = form.get("usuario");
+  const puesto = form.get("puesto");
+  const motivo = form.get("motivo") || "Programación por rango";
+  const totalDias = parseInt(form.get("totalDias") || "0");
+
+  if (!usuario || totalDias <= 0) {
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+    return;
+  }
+
+  const gestor = usuarios[usuario].nombre;
+
+  for (let i = 0; i < totalDias; i++) {
+    const fecha = form.get(`fecha_${i}`);
+    const tipoDia = form.get(`tipoDia_${i}`) || "Turno";
+    const inicio = form.get(`inicio_${i}`);
+    const fin = form.get(`fin_${i}`);
+
+    await db.collection("asignaciones").updateOne(
+      { usuario, fecha },
+      {
+        $set: {
+          usuario,
+          gestor,
+          puesto,
+          fecha,
+          horaInicioProgramada: inicio,
+          horaFinProgramada: fin,
+          tipoDia,
+          motivo,
+          esEmergencia: false,
+          actualizadoPor: sesion.nombre,
+          actualizadoEn: new Date()
+        }
+      },
+      { upsert: true }
+    );
+  }
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
 
     if (accion === "eliminar") {
       if (!sesion || sesion.rol !== "supervisor") {
@@ -1115,6 +1257,63 @@ if (req.url.startsWith("/editar-asignacion")) {
     </body>
     </html>
   `);
+  return;
+}
+
+if (req.url.startsWith("/programar-rango")) {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  enviarHTML(res, `
+    <html>
+    <head>
+      <title>Programar varios días</title>
+      ${estilos}
+    </head>
+    <body>
+      <header>
+        <div class="logo">CF</div>
+        <h1>📆 Programar varios días</h1>
+      </header>
+
+      <div class="contenedor">
+        <form method="POST">
+          <input type="hidden" name="accion" value="generar_rango">
+
+          <label>Gestor</label>
+          <select name="usuario" required>
+            ${Object.entries(usuarios)
+              .filter(([u, d]) => d.rol === "gestor")
+              .map(([u, d]) => `<option value="${u}">${d.nombre}</option>`)
+              .join("")}
+          </select>
+
+          <label>Puesto</label>
+          <select name="puesto" required>
+            ${puestos.map(p => `<option>${p}</option>`).join("")}
+          </select>
+
+          <label>Fecha inicio</label>
+          <input type="date" name="fechaInicio" required>
+
+          <label>Fecha fin</label>
+          <input type="date" name="fechaFin" required>
+
+          <label>Motivo general</label>
+          <input name="motivo" placeholder="Ej: programación quincenal">
+
+          <button type="submit">Generar días</button>
+        </form>
+
+        <a href="/app">⬅ Volver</a>
+      </div>
+    </body>
+    </html>
+  `);
+
   return;
 }
 
@@ -1353,6 +1552,10 @@ const asignaciones15Dias = await db.collection("asignaciones")
   <div class="panel">
     <h2>📅 Programación avanzada de puestos</h2>
     <p>Desde aquí puedes asignar turnos, descansos o disponibilidad para los próximos 15 días.</p>
+
+<div class="botones no-print" style="margin-bottom:15px;">
+  <a class="btn btn-success" href="/programar-rango">📆 Programar varios días</a>
+</div>
 
     <form method="POST">
       <input type="hidden" name="accion" value="asignar">
