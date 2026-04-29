@@ -903,18 +903,20 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? dashboardSupervisor : ""}
-<form method="POST" action="/iniciar-turno">
-  <label>Iniciar turno</label>
-
-  <select name="puesto" required>
-    ${opcionesPuestos}
-  </select>
-
-  <button type="submit">🟢 Iniciar turno</button>
-</form>
-
 
           ${sesion.rol === "gestor" ? `
+<form method="POST" action="/iniciar-turno">
+    <label>Iniciar turno</label>
+
+    <select name="puesto" required>
+      ${opcionesPuestos}
+    </select>
+
+    <button type="submit">🟢 Iniciar turno</button>
+  </form>
+
+  <form method="POST" action="/guardar" enctype="multipart/form-data">
+
             <form method="POST" action="/guardar" enctype="multipart/form-data">
               <label>Gestor</label>
               <input value="${sesion.nombre}" readonly>
