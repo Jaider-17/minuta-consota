@@ -856,19 +856,21 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
 
     const dashboardSupervisor = `
 const gestoresTurnoHTML = `
-<h3>👷 Gestores en turno</h3>
-<div class="panel">
-  ${turnosActivos.length === 0 
-    ? "<p>No hay gestores en turno</p>" 
-    : turnosActivos.map(t => `
-      <p>
-        <b>${t.gestor}</b> - ${t.puesto} <br>
-        Entrada: ${t.horaEntrada} <br>
-        Estado: ${t.estado}
-      </p>
-    `).join("")
-  }
-</div>
+const gestoresTurnoHTML = `
+  <h3>👷 Gestores en turno</h3>
+  <div class="panel">
+    ${
+      turnosActivos.length === 0
+        ? "<p>No hay gestores en turno</p>"
+        : turnosActivos.map(t => `
+          <p>
+            <b>${t.gestor}</b> - ${t.puesto}<br>
+            Entrada: ${t.horaEntrada}<br>
+            Estado: ${t.estado}
+          </p>
+        `).join("")
+    }
+  </div>
 `;
       <div class="panel">
         <h2>📊 Dashboard Gerencial</h2>
