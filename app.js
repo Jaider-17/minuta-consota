@@ -92,6 +92,11 @@ function opcionSeleccionada(valor, actual) {
 }
 
 function fechaColombia() {
+function calcularHoras(inicio, fin) {
+  const diferenciaMs = fin - inicio;
+  const horas = diferenciaMs / (1000 * 60 * 60);
+  return Number(horas.toFixed(2));
+}
   const ahora = new Date();
 
   const fecha = ahora.toLocaleDateString("es-CO", {
@@ -577,15 +582,16 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
-      const turno = {
-        gestor: sesion.nombre,
-        usuario: sesion.usuario,
-        puesto,
-        fecha,
-        fechaFiltro,
-        horaEntrada: hora,
-        estado: "Activo"
-      };
+   const turno = {
+  gestor: sesion.nombre,
+  usuario: sesion.usuario,
+  puesto,
+  fecha,
+  fechaFiltro,
+  horaEntrada: hora,
+  estado: "Activo",
+  creadoEn: new Date()
+};
 
       await db.collection("turnos").insertOne(turno);
 
@@ -595,6 +601,48 @@ const server = http.createServer(async (req, res) => {
 
     return;
   }
+if (req.method === "POST" && req.url === "/cerrar-turno") {
+  if (!sesion || sesion.rol !== "gestor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const { fecha, hora, fechaFiltro } = fechaColombia();
+
+  const turnoActivo = await db.collection("turnos").findOne({
+    usuario: sesion.usuario,
+    estado: "Activo"
+  });
+
+  if (!turnoActivo) {
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+    return;
+  }
+
+  const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
+  const salida = new Date();
+  const horasTrabajadas = calcularHoras(entrada, salida);
+
+  await db.collection("turnos").updateOne(
+    { _id: turnoActivo._id },
+    {
+      $set: {
+        fechaSalida: fecha,
+        fechaSalidaFiltro: fechaFiltro,
+        horaSalida: hora,
+        estado: "Cerrado",
+        cerradoEn: salida,
+        horasTrabajadas
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
 
   if (req.method === "POST") {
     let datos = "";
@@ -641,6 +689,29 @@ const server = http.createServer(async (req, res) => {
         res.end();
         return;
       }
+
+if (accion === "revisada") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  const id = form.get("id");
+
+  await db.collection("minutas").updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        estado: "Revisada"
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
 
       if (accion === "eliminar") {
         if (!sesion || sesion.rol !== "supervisor") {
@@ -830,6 +901,13 @@ const miTurnoActivo = await db.collection("turnos").findOne({
           ${sesion.rol === "supervisor" ? `
             <div class="botones no-print" style="margin-top:10px;">
               <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
+${(m.estado || "Pendiente") === "Pendiente" ? `
+  <form method="POST" style="box-shadow:none;padding:0;margin:0;">
+    <input type="hidden" name="accion" value="revisada">
+    <input type="hidden" name="id" value="${m._id}">
+    <button type="submit">✅ Marcar revisada</button>
+  </form>
+` : ""}
 
               <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
                 <input type="hidden" name="accion" value="eliminar">
@@ -955,6 +1033,9 @@ const miTurnoActivo = await db.collection("turnos").findOne({
           <p><b>Fecha:</b> ${miTurnoActivo.fecha || ""}</p>
           <p><b>Hora entrada:</b> ${miTurnoActivo.horaEntrada || ""}</p>
           <p><b>Estado:</b> <span class="estado-activo">${miTurnoActivo.estado}</span></p>
+<form method="POST" action="/cerrar-turno" onsubmit="return confirm('¿Seguro que deseas cerrar tu turno?');" style="box-shadow:none;padding:0;margin-top:10px;">
+  <button class="btn-danger" type="submit">🔴 Cerrar turno</button>
+</form>
         </div>
       `
       : `
