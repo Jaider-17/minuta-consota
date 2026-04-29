@@ -91,8 +91,32 @@ function opcionSeleccionada(valor, actual) {
   return valor === actual ? "selected" : "";
 }
 
+function fechaColombia() {
+  const ahora = new Date();
+
+  const fecha = ahora.toLocaleDateString("es-CO", {
+    timeZone: "America/Bogota"
+  });
+
+  const hora = ahora.toLocaleTimeString("es-CO", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    minute: "2-digit",
+    second: "2-digit",
+    hour12: true
+  });
+
+  const fechaFiltro = ahora.toLocaleDateString("en-CA", {
+    timeZone: "America/Bogota"
+  });
+
+  const mesFiltro = fechaFiltro.slice(0, 7);
+
+  return { fecha, hora, fechaFiltro, mesFiltro };
+}
+
 function detectarAlerta(novedad = "") {
-  const texto = novedad.toLowerCase();
+  const texto = novadadSeguro(novedad);
 
   if (
     texto.includes("emergencia") ||
@@ -112,6 +136,10 @@ function detectarAlerta(novedad = "") {
   }
 
   return { clase: "", etiqueta: "" };
+}
+
+function novadadSeguro(texto = "") {
+  return String(texto || "").toLowerCase();
 }
 
 async function obtenerMinutasFiltradas(url, sesion) {
@@ -314,6 +342,7 @@ const estilos = `
     display: grid;
     grid-template-columns: repeat(2, 1fr);
     gap: 15px;
+    margin-bottom: 18px;
   }
 
   .metric {
@@ -326,6 +355,19 @@ const estilos = `
   .metric strong {
     font-size: 24px;
     color: #005baa;
+  }
+
+  .turno-card {
+    background: #f8fafc;
+    border-left: 5px solid #22c55e;
+    padding: 12px;
+    border-radius: 12px;
+    margin-bottom: 10px;
+  }
+
+  .estado-activo {
+    color: #16a34a;
+    font-weight: bold;
   }
 
   .alerta-roja {
@@ -386,15 +428,20 @@ const server = http.createServer(async (req, res) => {
     const worksheet = workbook.addWorksheet("Minutas");
 
     worksheet.columns = [
-      { header: "Fecha", key: "fecha", width: 24 },
+      { header: "Fecha", key: "fecha", width: 18 },
+      { header: "Hora", key: "hora", width: 18 },
       { header: "Gestor", key: "gestor", width: 22 },
       { header: "Puesto", key: "puesto", width: 25 },
       { header: "Tipo", key: "tipo", width: 20 },
+      { header: "Estado", key: "estado", width: 18 },
       { header: "Novedad", key: "novedad", width: 50 },
       { header: "Foto", key: "foto", width: 55 }
     ];
 
-    minutas.forEach(m => worksheet.addRow(m));
+    minutas.forEach(m => worksheet.addRow({
+      ...m,
+      estado: m.estado || "Pendiente"
+    }));
 
     res.writeHead(200, {
       "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -418,11 +465,12 @@ const server = http.createServer(async (req, res) => {
 
     const contenido = minutas.map(m => `
       <div class="card">
-        <div class="fecha">${m.fecha}</div>
-        <h3>${m.puesto}</h3>
-        <p><b>Gestor:</b> ${m.gestor}</p>
-        <p><b>Tipo:</b> ${m.tipo}</p>
-        <p><b>Novedad:</b> ${m.novedad}</p>
+        <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
+        <h3>${m.puesto || ""}</h3>
+        <p><b>Gestor:</b> ${m.gestor || ""}</p>
+        <p><b>Tipo:</b> ${m.tipo || ""}</p>
+        <p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
+        <p><b>Novedad:</b> ${m.novedad || ""}</p>
         ${m.foto ? `<p><b>Foto:</b> ${m.foto}</p>` : ""}
       </div>
     `).join("");
@@ -474,36 +522,20 @@ const server = http.createServer(async (req, res) => {
           }
         }
 
-const ahora = new Date();
+        const { fecha, hora, fechaFiltro } = fechaColombia();
 
-const fecha = ahora.toLocaleDateString("es-CO", {
-  timeZone: "America/Bogota"
-});
-
-const hora = ahora.toLocaleTimeString("es-CO", {
-  timeZone: "America/Bogota",
-  hour: "2-digit",
-  minute: "2-digit",
-  second: "2-digit",
-  hour12: true
-});
-
-const fechaFiltro = ahora.toLocaleDateString("en-CA", {
-  timeZone: "America/Bogota"
-});
-
-const minuta = {
-  fecha,
-  hora,
-  fechaFiltro,
-  usuario: sesion.usuario,
-  gestor: sesion.nombre,
-  puesto: req.body.puesto,
-  tipo: req.body.tipo,
-  novedad: req.body.novedad,
-  estado: "Pendiente",
-  foto: fotoUrl
-};
+        const minuta = {
+          fecha,
+          hora,
+          fechaFiltro,
+          usuario: sesion.usuario,
+          gestor: sesion.nombre,
+          puesto: req.body.puesto,
+          tipo: req.body.tipo,
+          novedad: req.body.novedad,
+          estado: "Pendiente",
+          foto: fotoUrl
+        };
 
         await db.collection("minutas").insertOne(minuta);
 
@@ -517,53 +549,52 @@ const minuta = {
 
     return;
   }
-if (req.method === "POST" && req.url === "/iniciar-turno") {
-  if (!sesion || sesion.rol !== "gestor") {
-    res.writeHead(302, { Location: "/" });
-    res.end();
+
+  if (req.method === "POST" && req.url === "/iniciar-turno") {
+    if (!sesion || sesion.rol !== "gestor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    let datos = "";
+
+    req.on("data", parte => datos += parte);
+
+    req.on("end", async () => {
+      const form = new URLSearchParams(datos);
+      const puesto = form.get("puesto");
+      const { fecha, hora, fechaFiltro } = fechaColombia();
+
+      const turnoActivo = await db.collection("turnos").findOne({
+        usuario: sesion.usuario,
+        estado: "Activo"
+      });
+
+      if (turnoActivo) {
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+        return;
+      }
+
+      const turno = {
+        gestor: sesion.nombre,
+        usuario: sesion.usuario,
+        puesto,
+        fecha,
+        fechaFiltro,
+        horaEntrada: hora,
+        estado: "Activo"
+      };
+
+      await db.collection("turnos").insertOne(turno);
+
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+    });
+
     return;
   }
-
-  let datos = "";
-
-  req.on("data", parte => datos += parte);
-
-  req.on("end", async () => {
-    const form = new URLSearchParams(datos);
-    const puesto = form.get("puesto");
-
-    const ahora = new Date();
-
-    const fecha = ahora.toLocaleDateString("es-CO", {
-      timeZone: "America/Bogota"
-    });
-
-    const horaEntrada = ahora.toLocaleTimeString("es-CO", {
-      timeZone: "America/Bogota",
-      hour: "2-digit",
-      minute: "2-digit",
-      second: "2-digit",
-      hour12: true
-    });
-
-    const turno = {
-      gestor: sesion.nombre,
-      usuario: sesion.usuario,
-      puesto,
-      fecha,
-      horaEntrada,
-      estado: "Activo"
-    };
-
-    await db.collection("turnos").insertOne(turno);
-
-    res.writeHead(302, { Location: "/app" });
-    res.end();
-  });
-
-  return;
-}
-
 
   if (req.method === "POST") {
     let datos = "";
@@ -575,7 +606,7 @@ if (req.method === "POST" && req.url === "/iniciar-turno") {
       const accion = form.get("accion");
 
       if (accion === "login") {
-        const usuario = form.get("usuario").toLowerCase();
+        const usuario = (form.get("usuario") || "").toLowerCase();
         const clave = form.get("clave");
 
         if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
@@ -748,23 +779,24 @@ if (req.method === "POST" && req.url === "/iniciar-turno") {
     const filtroFecha = url.searchParams.get("fecha") || "";
 
     let minutas = await obtenerMinutasFiltradas(url, sesion);
-const turnosActivos = await db.collection("turnos")
-  .find({ estado: "Activo" })
-  .toArray();
+
+    const turnosActivos = await db.collection("turnos")
+      .find({ estado: "Activo" })
+      .toArray();
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
     const totalMinutas = minutas.length;
-const mesActual = new Date().toISOString().slice(0, 7);
+    const { fechaFiltro: hoy, mesFiltro: mesActual } = fechaColombia();
 
-const minutasMes = minutas.filter(m => 
-  m.fechaFiltro && m.fechaFiltro.startsWith(mesActual)
-).length;
-
-const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
-
-    const hoy = new Date().toISOString().slice(0, 10);
     const minutasHoy = minutas.filter(m => m.fechaFiltro === hoy).length;
+
+    const minutasMes = minutas.filter(m =>
+      m.fechaFiltro && m.fechaFiltro.startsWith(mesActual)
+    ).length;
+
+    const pendientes = minutas.filter(m => (m.estado || "Pendiente") === "Pendiente").length;
+    const puestosActivos = new Set(turnosActivos.map(t => t.puesto)).size;
 
     const porPuesto = {};
     minutas.forEach(m => {
@@ -776,18 +808,18 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
       porGestor[m.gestor] = (porGestor[m.gestor] || 0) + 1;
     });
 
-    const historial = minutas.reverse().map(m => {
+    const historial = [...minutas].reverse().map(m => {
       const alerta = detectarAlerta(m.novedad);
 
       return `
         <div class="card ${alerta.clase}">
-         <div class="fecha">${m.fecha} - ${m.hora || ""}</div>
-          <h3>${m.puesto}</h3>
+          <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
+          <h3>${m.puesto || ""}</h3>
           ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
-          <p><b>Gestor:</b> ${m.gestor}</p>
-          <p><b>Tipo:</b> ${m.tipo}</p>
-<p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
-          <p><b>Novedad:</b> ${m.novedad}</p>
+          <p><b>Gestor:</b> ${m.gestor || ""}</p>
+          <p><b>Tipo:</b> ${m.tipo || ""}</p>
+          <p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
+          <p><b>Novedad:</b> ${m.novedad || ""}</p>
           ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
 
           ${sesion.rol === "supervisor" ? `
@@ -854,49 +886,31 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
       </form>
     `;
 
-const gestoresTurnoHTML = `
-  <h3>👷 Gestores en turno</h3>
-  <div class="panel">
-    ${
-      turnosActivos.length === 0
-        ? "<p>No hay gestores en turno</p>"
-        : turnosActivos.map(t => `
-          <p>
-            <b>${t.gestor}</b> - ${t.puesto}<br>
-            Entrada: ${t.horaEntrada}<br>
-            Estado: ${t.estado}
-          </p>
-        `).join("")
-    }
-  </div>
-`;
+    const dashboardSupervisor = `
+      <div class="panel">
+        <h2>📊 Dashboard Gerencial</h2>
 
-   const dashboardSupervisor = `
-  <div class="dashboard">
+        <div class="dashboard">
+          <div class="metric">
+            <p>Novedades hoy</p>
+            <strong>${minutasHoy}</strong>
+          </div>
 
-    <div class="metric">
-      <p>Novedades hoy</p>
-      <strong>${minutasHoy}</strong>
-    </div>
+          <div class="metric">
+            <p>Novedades del mes</p>
+            <strong>${minutasMes}</strong>
+          </div>
 
-    <div class="metric">
-      <p>Novedades del mes</p>
-      <strong>${minutasMes}</strong>
-    </div>
+          <div class="metric">
+            <p>Pendientes</p>
+            <strong>${pendientes}</strong>
+          </div>
 
-    <div class="metric">
-      <p>Pendientes</p>
-      <strong>${pendientes}</strong>
-    </div>
-
-    <div class="metric">
-      <p>Total registros</p>
-      <strong>${totalMinutas}</strong>
-    </div>
-
-  </div>
-`;
-
+          <div class="metric">
+            <p>Puestos activos</p>
+            <strong>${puestosActivos}</strong>
+          </div>
+        </div>
 
         <h3>Por puesto</h3>
         ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
@@ -904,6 +918,60 @@ const gestoresTurnoHTML = `
         <h3>Por gestor</h3>
         ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
       </div>
+    `;
+
+    const gestoresTurnoHTML = `
+      <div class="panel">
+        <h2>👷 Gestores en turno</h2>
+        ${
+          turnosActivos.length === 0
+            ? "<p>No hay gestores en turno.</p>"
+            : turnosActivos.map(t => `
+              <div class="turno-card">
+                <p><b>${t.gestor}</b></p>
+                <p><b>Puesto:</b> ${t.puesto}</p>
+                <p><b>Fecha:</b> ${t.fecha || ""}</p>
+                <p><b>Entrada:</b> ${t.horaEntrada || ""}</p>
+                <p><b>Estado:</b> <span class="estado-activo">${t.estado}</span></p>
+              </div>
+            `).join("")
+        }
+      </div>
+    `;
+
+    const formularioGestor = `
+      <form method="POST" action="/iniciar-turno">
+        <label>Iniciar turno</label>
+
+        <select name="puesto" required>
+          ${opcionesPuestos}
+        </select>
+
+        <button type="submit">🟢 Iniciar turno</button>
+      </form>
+
+      <form method="POST" action="/guardar" enctype="multipart/form-data">
+        <label>Gestor</label>
+        <input value="${sesion.nombre}" readonly>
+
+        <label>Puesto del turno</label>
+        <select name="puesto" required>
+          ${opcionesPuestos}
+        </select>
+
+        <label>Tipo de registro</label>
+        <select name="tipo" required>
+          ${tipos.map(t => `<option>${t}</option>`).join("")}
+        </select>
+
+        <label>Novedad</label>
+        <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
+
+        <label>Foto evidencia</label>
+        <input type="file" name="foto" accept="image/*" capture="environment">
+
+        <button type="submit">Guardar minuta</button>
+      </form>
     `;
 
     enviarHTML(res, `
@@ -922,47 +990,8 @@ const gestoresTurnoHTML = `
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML : ""}
-
-${sesion.rol === "gestor" ? `
-
-<form method="POST" action="/iniciar-turno">
-  <label>Iniciar turno</label>
-
-  <select name="puesto" required>
-    ${opcionesPuestos}
-  </select>
-
-  <button type="submit">🟢 Iniciar turno</button>
-</form>
-
-` : ""}
-
-  <form method="POST" action="/guardar" enctype="multipart/form-data">
-
-            <form method="POST" action="/guardar" enctype="multipart/form-data">
-              <label>Gestor</label>
-              <input value="${sesion.nombre}" readonly>
-
-              <label>Puesto del turno</label>
-              <select name="puesto" required>
-                ${opcionesPuestos}
-              </select>
-
-              <label>Tipo de registro</label>
-              <select name="tipo" required>
-                ${tipos.map(t => `<option>${t}</option>`).join("")}
-              </select>
-
-              <label>Novedad</label>
-              <textarea name="novedad" required placeholder="Escribe aquí lo ocurrido..."></textarea>
-
-              <label>Foto evidencia</label>
-              <input type="file" name="foto" accept="image/*" capture="environment">
-
-              <button type="submit">Guardar minuta</button>
-            </form>
-          ` : `
+          ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML : ""}
+          ${sesion.rol === "gestor" ? formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
