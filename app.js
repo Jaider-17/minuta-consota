@@ -517,6 +517,53 @@ const minuta = {
 
     return;
   }
+if (req.method === "POST" && req.url === "/iniciar-turno") {
+  if (!sesion || sesion.rol !== "gestor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
+
+  let datos = "";
+
+  req.on("data", parte => datos += parte);
+
+  req.on("end", async () => {
+    const form = new URLSearchParams(datos);
+    const puesto = form.get("puesto");
+
+    const ahora = new Date();
+
+    const fecha = ahora.toLocaleDateString("es-CO", {
+      timeZone: "America/Bogota"
+    });
+
+    const horaEntrada = ahora.toLocaleTimeString("es-CO", {
+      timeZone: "America/Bogota",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hour12: true
+    });
+
+    const turno = {
+      gestor: sesion.nombre,
+      usuario: sesion.usuario,
+      puesto,
+      fecha,
+      horaEntrada,
+      estado: "Activo"
+    };
+
+    await db.collection("turnos").insertOne(turno);
+
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+  });
+
+  return;
+}
+
 
   if (req.method === "POST") {
     let datos = "";
@@ -856,6 +903,16 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? dashboardSupervisor : ""}
+<form method="POST" action="/iniciar-turno">
+  <label>Iniciar turno</label>
+
+  <select name="puesto" required>
+    ${opcionesPuestos}
+  </select>
+
+  <button type="submit">🟢 Iniciar turno</button>
+</form>
+
 
           ${sesion.rol === "gestor" ? `
             <form method="POST" action="/guardar" enctype="multipart/form-data">
