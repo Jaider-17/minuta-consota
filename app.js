@@ -476,11 +476,20 @@ const server = http.createServer(async (req, res) => {
 
 const ahora = new Date();
 
-const fecha = ahora.toLocaleDateString("es-CO");
+const fecha = ahora.toLocaleDateString("es-CO", {
+  timeZone: "America/Bogota"
+});
+
 const hora = ahora.toLocaleTimeString("es-CO", {
+  timeZone: "America/Bogota",
   hour: "2-digit",
   minute: "2-digit",
-  second: "2-digit"
+  second: "2-digit",
+  hour12: true
+});
+
+const fechaFiltro = ahora.toLocaleDateString("en-CA", {
+  timeZone: "America/Bogota"
 });
 
 const minuta = {
