@@ -115,6 +115,22 @@ function fechaColombia() {
   return { fecha, hora, fechaFiltro, mesFiltro };
 }
 
+function obtenerTipoTurno() {
+  const hora = new Date().toLocaleString("es-CO", {
+    timeZone: "America/Bogota",
+    hour: "2-digit",
+    hour12: false
+  });
+
+  const h = parseInt(hora);
+
+  if (h >= 6 && h < 18) {
+    return "Diurno ☀️";
+  }
+
+  return "Nocturno 🌙";
+}
+
 function calcularTiempoTrabajado(inicio, fin) {
   const diferenciaMs = fin - inicio;
   const minutosTotales = Math.max(0, Math.floor(diferenciaMs / (1000 * 60)));
@@ -605,15 +621,17 @@ const server = http.createServer(async (req, res) => {
       }
 
       const turno = {
-        gestor: sesion.nombre,
-        usuario: sesion.usuario,
-        puesto,
-        fecha,
-        fechaFiltro,
-        horaEntrada: hora,
-        estado: "Activo",
-        creadoEn: new Date()
-      };
+  gestor: sesion.nombre,
+  usuario: sesion.usuario,
+  puesto,
+  fecha,
+  fechaFiltro,
+  horaEntrada: hora,
+  tipoTurno: obtenerTipoTurno(),
+tipoTurno: obtenerTipoTurno(),
+  estado: "Activo",
+  creadoEn: new Date()
+};
 
       await db.collection("turnos").insertOne(turno);
 
@@ -1166,6 +1184,7 @@ const server = http.createServer(async (req, res) => {
                 <p><b>Puesto:</b> ${t.puesto}</p>
                 <p><b>Fecha:</b> ${t.fecha || ""}</p>
                 <p><b>Entrada:</b> ${t.horaEntrada || ""}</p>
+<p><b>Tipo de turno:</b> ${t.tipoTurno || "No registrado"}</p>
                 <p><b>Estado:</b> <span class="estado-activo">${t.estado}</span></p>
               </div>
             `).join("")
@@ -1211,6 +1230,7 @@ const server = http.createServer(async (req, res) => {
               <p><b>Puesto:</b> ${miTurnoActivo.puesto}</p>
               <p><b>Fecha:</b> ${miTurnoActivo.fecha || ""}</p>
               <p><b>Hora entrada:</b> ${miTurnoActivo.horaEntrada || ""}</p>
+<p><b>Tipo de turno:</b> ${miTurnoActivo.tipoTurno || "No registrado"}</p>
               <p><b>Estado:</b> <span class="estado-activo">${miTurnoActivo.estado}</span></p>
 
               <form method="POST" action="/cerrar-turno" onsubmit="return confirm('¿Seguro que deseas cerrar tu turno?');" style="box-shadow:none;padding:0;margin-top:10px;">
