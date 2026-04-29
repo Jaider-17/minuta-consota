@@ -766,8 +766,12 @@ tipoTurno: obtenerTipoTurno(),
         }
 
         const usuario = form.get("usuario");
-        const puesto = form.get("puesto");
-        const fecha = form.get("fecha");
+const puesto = form.get("puesto");
+const fecha = form.get("fecha");
+const horaInicioProgramada = form.get("horaInicioProgramada");
+const horaFinProgramada = form.get("horaFinProgramada");
+const motivo = form.get("motivo") || "Asignación normal";
+const emergencia = form.get("emergencia") === "si";
 
         if (!usuarios[usuario] || usuarios[usuario].rol !== "gestor") {
           res.writeHead(302, { Location: "/app" });
@@ -780,14 +784,18 @@ tipoTurno: obtenerTipoTurno(),
         await db.collection("asignaciones").updateOne(
           { usuario, fecha },
           {
-            $set: {
-              gestor,
-              usuario,
-              puesto,
-              fecha,
-              actualizadoPor: sesion.nombre,
-              actualizadoEn: new Date()
-            },
+        $set: {
+  gestor,
+  usuario,
+  puesto,
+  fecha,
+  horaInicioProgramada,
+  horaFinProgramada,
+  motivo,
+  esEmergencia: emergencia,
+  actualizadoPor: sesion.nombre,
+  actualizadoEn: new Date()
+},
             $setOnInsert: {
               creadoPor: sesion.nombre,
               creadoEn: new Date()
@@ -1105,6 +1113,13 @@ tipoTurno: obtenerTipoTurno(),
           <label>Fecha</label>
           <input type="date" name="fecha" value="${hoyAsignacion}" required>
 
+<label>Hora inicio programada</label>
+<input type="time" name="horaInicioProgramada" required>
+
+<label>Hora fin programada</label>
+<input type="time" name="horaFinProgramada" required>
+
+
 <label>Motivo</label>
 <input name="motivo" placeholder="Ej: turno normal, cambio por incapacidad..." required>
 
@@ -1125,7 +1140,8 @@ tipoTurno: obtenerTipoTurno(),
               <div class="turno-card">
                 <p><b>${a.gestor}</b></p>
                 <p><b>Puesto:</b> ${a.puesto}</p>
-                <p><b>Fecha:</b> ${a.fecha}</p>
+         <p><b>Fecha:</b> ${a.fecha}</p>
+<p><b>Horario:</b> ${a.horaInicioProgramada || "No definida"} - ${a.horaFinProgramada || "No definida"}</p>
 <p><b>Motivo:</b> ${a.motivo || "Sin motivo"}</p>
 <p><b>Tipo:</b> ${a.esEmergencia ? "🚨 Emergencia" : "Normal"}</p>
 <p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
@@ -1213,12 +1229,13 @@ tipoTurno: obtenerTipoTurno(),
     `;
 
     const asignacionHTML = asignacionHoy ? `
-      <div class="panel">
-        <h2>📍 Tu puesto asignado hoy</h2>
-        <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
-        <p><b>Fecha:</b> ${asignacionHoy.fecha}</p>
-      </div>
-    ` : "";
+  <div class="panel">
+    <h2>📍 Tu puesto asignado hoy</h2>
+    <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
+    <p><b>Fecha:</b> ${asignacionHoy.fecha}</p>
+    <p><b>Horario programado:</b> ${asignacionHoy.horaInicioProgramada || "No definida"} - ${asignacionHoy.horaFinProgramada || "No definida"}</p>
+  </div>
+` : "";
 
     const formularioGestor = `
       ${
