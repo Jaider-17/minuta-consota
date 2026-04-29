@@ -585,24 +585,61 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
     const minutas = await obtenerMinutasFiltradas(url, sesion);
 
-    const contenido = minutas.map(m => `
-      <div class="card">
-        <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
-        <h3>${m.puesto || ""}</h3>
-        <p><b>Gestor:</b> ${m.gestor || ""}</p>
-        <p><b>Tipo:</b> ${m.tipo || ""}</p>
-        <p><b>Estado:</b> ${m.estado || "Pendiente"}</p>
-        <p><b>Novedad:</b> ${m.novedad || ""}</p>
-        ${m.foto ? `<p><b>Foto:</b> ${m.foto}</p>` : ""}
+   const contenido = (() => {
+
+  const minutasPorPuesto = {};
+
+  minutas.forEach(m => {
+    if (!minutasPorPuesto[m.puesto]) {
+      minutasPorPuesto[m.puesto] = [];
+    }
+    minutasPorPuesto[m.puesto].push(m);
+  });
+
+  return Object.keys(minutasPorPuesto).map(puesto => `
+    <div class="card">
+      <h3 style="cursor:pointer;" onclick="toggle('${puesto}')">
+        ${puesto} ⬇
+      </h3>
+
+      <div id="grupo-${puesto}" style="display:none;">
+
+        ${
+          minutasPorPuesto[puesto]
+            .sort((a,b) => new Date(b.fecha) - new Date(a.fecha))
+            .map(m => `
+              <div class="turno-card">
+                <p><b>${m.gestor || ""}</b></p>
+                <p>${m.novedad || ""}</p>
+                <p>${m.fecha || ""}</p>
+              </div>
+            `).join("")
+        }
+
       </div>
-    `).join("");
+    </div>
+  `).join("");
+
+})();
 
     enviarHTML(res, `
       <html>
       <head>
-        <title>Reporte de Minutas</title>
-        ${estilos}
-      </head>
+  <title>Reporte de Minutas</title>
+  ${estilos}
+
+  <script>
+    function toggle(puesto) {
+      const el = document.getElementById("grupo-" + puesto);
+      if (el.style.display === "none") {
+        el.style.display = "block";
+      } else {
+        el.style.display = "none";
+      }
+    }
+  </script>
+
+</head>
       <body>
         <div class="contenedor">
           <h1>Reporte de Minutas</h1>
@@ -1431,6 +1468,14 @@ const asignaciones15Dias = await db.collection("asignaciones")
   .sort({ fecha: 1, gestor: 1 })
   .toArray();
 
+const miProgramacion15Dias = await db.collection("asignaciones")
+  .find({
+    usuario: sesion.usuario,
+    fecha: { $in: fechasProgramacion }
+  })
+  .sort({ fecha: 1 })
+  .toArray();
+
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
     const { fechaFiltro: hoy, mesFiltro: mesActual } = fechaColombia();
@@ -1601,46 +1646,49 @@ const asignaciones15Dias = await db.collection("asignaciones")
       <button type="submit">💾 Guardar asignación</button>
     </form>
 
-    <h3>🗓️ Calendario próximos 15 días</h3>
+    <h3>🗓️ Programación próximos 15 días</h3>
+
+<div style="overflow-x:auto;">
+  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+    <tr style="background:#eaf3ff;">
+      <th style="padding:10px;">Fecha</th>
+      <th style="padding:10px;">Gestor</th>
+      <th style="padding:10px;">Puesto</th>
+      <th style="padding:10px;">Horario</th>
+      <th style="padding:10px;">Tipo</th>
+      <th style="padding:10px;">Acciones</th>
+    </tr>
 
     ${
-      diasProgramacion.map(dia => {
-        const asignacionesDia = asignaciones15Dias.filter(a => a.fecha === dia.fecha);
+      asignaciones15Dias.length === 0
+        ? `
+          <tr>
+            <td colspan="6" style="padding:12px;">No hay programación.</td>
+          </tr>
+        `
+        : asignaciones15Dias.map(a => `
+          <tr style="border-bottom:1px solid #ddd;">
+            <td style="padding:10px;">${a.fecha || ""}</td>
+            <td style="padding:10px;">${a.gestor || ""}</td>
+            <td style="padding:10px;">${a.puesto || ""}</td>
+            <td style="padding:10px;">
+              ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
+            </td>
+            <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
+            <td style="padding:10px;">
+              <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
 
-        return `
-          <div class="card">
-            <h3>${dia.nombreDia}</h3>
-            <p class="fecha">${dia.fecha}</p>
-
-            ${
-              asignacionesDia.length === 0
-                ? "<p>No hay programación para este día.</p>"
-                : asignacionesDia.map(a => `
-                  <div class="turno-card">
-                    <p><b>${a.gestor}</b></p>
-                    <p><b>Puesto:</b> ${a.puesto || ""}</p>
-                    <p><b>Horario:</b> ${a.horaInicioProgramada || "No definido"} - ${a.horaFinProgramada || "No definido"}</p>
-                    <p><b>Tipo de día:</b> ${a.tipoDia || "Turno"}</p>
-                    <p><b>Motivo:</b> ${a.motivo || "Sin motivo"}</p>
-                    <p><b>Emergencia:</b> ${a.esEmergencia ? "🚨 Sí" : "No"}</p>
-                    <p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
-
-                    <div class="botones no-print" style="margin-top:10px;">
-                      <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️ Editar</a>
-
-                      <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta asignación?');" style="box-shadow:none;padding:0;margin:0;">
-                        <input type="hidden" name="accion" value="eliminar_asignacion">
-                        <input type="hidden" name="id" value="${a._id}">
-                        <button class="btn-danger" type="submit">🗑️ Eliminar</button>
-                      </form>
-                    </div>
-                  </div>
-                `).join("")
-            }
-          </div>
-        `;
-      }).join("")
+              <form method="POST" style="display:inline;">
+                <input type="hidden" name="accion" value="eliminar_asignacion">
+                <input type="hidden" name="id" value="${a._id}">
+                <button class="btn-danger">🗑️</button>
+              </form>
+            </td>
+          </tr>
+        `).join("")
     }
+  </table>
+</div>
   </div>
 `;
 
@@ -1725,14 +1773,37 @@ const asignaciones15Dias = await db.collection("asignaciones")
       </div>
     `;
 
-    const asignacionHTML = asignacionHoy ? `
+  const programacionGestorHTML = `
   <div class="panel">
-    <h2>📍 Tu puesto asignado hoy</h2>
-    <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
-    <p><b>Fecha:</b> ${asignacionHoy.fecha}</p>
-    <p><b>Horario programado:</b> ${asignacionHoy.horaInicioProgramada || "No definida"} - ${asignacionHoy.horaFinProgramada || "No definida"}</p>
+    <h2>📆 Mi programación próximos 15 días</h2>
+
+    ${
+      miProgramacion15Dias.length === 0
+        ? "<p>No tienes programación registrada para los próximos días.</p>"
+        : `
+          <div style="overflow-x:auto;">
+            <table style="width:100%; border-collapse:collapse;">
+              <tr style="background:#eaf3ff;">
+                <th style="padding:10px; text-align:left;">Fecha</th>
+                <th style="padding:10px; text-align:left;">Puesto</th>
+                <th style="padding:10px; text-align:left;">Horario</th>
+                <th style="padding:10px; text-align:left;">Tipo</th>
+              </tr>
+
+              ${miProgramacion15Dias.map(a => `
+                <tr style="border-bottom:1px solid #ddd;">
+                  <td style="padding:10px;">${a.fecha || ""}</td>
+                  <td style="padding:10px;">${a.puesto || ""}</td>
+                  <td style="padding:10px;">${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}</td>
+                  <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
+                </tr>
+              `).join("")}
+            </table>
+          </div>
+        `
+    }
   </div>
-` : "";
+`;
 
     const formularioGestor = `
       ${
@@ -1806,7 +1877,7 @@ const asignaciones15Dias = await db.collection("asignaciones")
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
-          ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
+          ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
