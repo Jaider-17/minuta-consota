@@ -854,8 +854,6 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
       </form>
     `;
 
-    const dashboardSupervisor = `
-const gestoresTurnoHTML = `
 const gestoresTurnoHTML = `
   <h3>👷 Gestores en turno</h3>
   <div class="panel">
@@ -872,30 +870,32 @@ const gestoresTurnoHTML = `
     }
   </div>
 `;
-      <div class="panel">
-        <h2>📊 Dashboard Gerencial</h2>
 
-       <div class="dashboard">
-  <div class="metric">
-    <p>Novedades hoy</p>
-    <strong>${minutasHoy}</strong>
-  </div>
+   const dashboardSupervisor = `
+  <div class="dashboard">
 
-  <div class="metric">
-    <p>Novedades del mes</p>
-    <strong>${minutasMes}</strong>
-  </div>
+    <div class="metric">
+      <p>Novedades hoy</p>
+      <strong>${minutasHoy}</strong>
+    </div>
 
-  <div class="metric">
-    <p>Pendientes</p>
-    <strong>${pendientes}</strong>
-  </div>
+    <div class="metric">
+      <p>Novedades del mes</p>
+      <strong>${minutasMes}</strong>
+    </div>
 
-  <div class="metric">
-    <p>Total registros</p>
-    <strong>${totalMinutas}</strong>
+    <div class="metric">
+      <p>Pendientes</p>
+      <strong>${pendientes}</strong>
+    </div>
+
+    <div class="metric">
+      <p>Total registros</p>
+      <strong>${totalMinutas}</strong>
+    </div>
+
   </div>
-</div>
+`;
 
 
         <h3>Por puesto</h3>
@@ -923,16 +923,20 @@ const gestoresTurnoHTML = `
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
 ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML : ""}
-          ${sesion.rol === "gestor" ? `
+
+${sesion.rol === "gestor" ? `
+
 <form method="POST" action="/iniciar-turno">
-    <label>Iniciar turno</label>
+  <label>Iniciar turno</label>
 
-    <select name="puesto" required>
-      ${opcionesPuestos}
-    </select>
+  <select name="puesto" required>
+    ${opcionesPuestos}
+  </select>
 
-    <button type="submit">🟢 Iniciar turno</button>
-  </form>
+  <button type="submit">🟢 Iniciar turno</button>
+</form>
+
+` : ""}
 
   <form method="POST" action="/guardar" enctype="multipart/form-data">
 
