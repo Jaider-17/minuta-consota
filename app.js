@@ -893,6 +893,13 @@ const server = http.createServer(async (req, res) => {
       estado: "Activo"
     });
 
+const { fechaFiltro: hoyAsignacion } = fechaColombia();
+
+const asignacionHoy = await db.collection("asignaciones").findOne({
+  usuario: sesion.usuario,
+  fecha: hoyAsignacion
+});
+
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
     const totalMinutas = minutas.length;
@@ -1087,6 +1094,13 @@ const server = http.createServer(async (req, res) => {
       </div>
     `;
 
+const asignacionHTML = asignacionHoy ? `
+  <div class="panel">
+    <h2>📍 Tu puesto asignado hoy</h2>
+    <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
+  </div>
+` : "";
+
     const formularioGestor = `
       ${
         miTurnoActivo
@@ -1158,7 +1172,7 @@ const server = http.createServer(async (req, res) => {
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
-          ${sesion.rol === "gestor" ? formularioGestor : `
+         ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
