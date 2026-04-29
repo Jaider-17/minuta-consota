@@ -748,6 +748,9 @@ if (req.method === "POST" && req.url === "/iniciar-turno") {
     const filtroFecha = url.searchParams.get("fecha") || "";
 
     let minutas = await obtenerMinutasFiltradas(url, sesion);
+const turnosActivos = await db.collection("turnos")
+  .find({ estado: "Activo" })
+  .toArray();
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
@@ -852,6 +855,21 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
     `;
 
     const dashboardSupervisor = `
+const gestoresTurnoHTML = `
+<h3>👷 Gestores en turno</h3>
+<div class="panel">
+  ${turnosActivos.length === 0 
+    ? "<p>No hay gestores en turno</p>" 
+    : turnosActivos.map(t => `
+      <p>
+        <b>${t.gestor}</b> - ${t.puesto} <br>
+        Entrada: ${t.horaEntrada} <br>
+        Estado: ${t.estado}
+      </p>
+    `).join("")
+  }
+</div>
+`;
       <div class="panel">
         <h2>📊 Dashboard Gerencial</h2>
 
@@ -902,8 +920,7 @@ const pendientes = minutas.filter(m => m.estado === "Pendiente").length;
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-          ${sesion.rol === "supervisor" ? dashboardSupervisor : ""}
-
+${sesion.rol === "supervisor" ? dashboardSupervisor + gestoresTurnoHTML : ""}
           ${sesion.rol === "gestor" ? `
 <form method="POST" action="/iniciar-turno">
     <label>Iniciar turno</label>
