@@ -722,33 +722,6 @@ const server = http.createServer(async (req, res) => {
           return;
         }
 
-if (accion === "asignar") {
-  if (!sesion || sesion.rol !== "supervisor") {
-    res.writeHead(302, { Location: "/" });
-    res.end();
-    return;
-  }
-
-  const usuario = form.get("usuario");
-  const puesto = form.get("puesto");
-  const fecha = form.get("fecha");
-
-  const gestor = usuarios[usuario].nombre;
-
-  await db.collection("asignaciones").insertOne({
-    gestor,
-    usuario,
-    puesto,
-    fecha,
-    creadoPor: sesion.nombre,
-    creadoEn: new Date()
-  });
-
-  res.writeHead(302, { Location: "/app" });
-  res.end();
-  return;
-}
-
         const id = form.get("id");
 
         await db.collection("minutas").updateOne(
@@ -760,6 +733,49 @@ if (accion === "asignar") {
               revisadaEn: new Date()
             }
           }
+        );
+
+        res.writeHead(302, { Location: "/app" });
+        res.end();
+        return;
+      }
+
+      if (accion === "asignar") {
+        if (!sesion || sesion.rol !== "supervisor") {
+          res.writeHead(302, { Location: "/" });
+          res.end();
+          return;
+        }
+
+        const usuario = form.get("usuario");
+        const puesto = form.get("puesto");
+        const fecha = form.get("fecha");
+
+        if (!usuarios[usuario] || usuarios[usuario].rol !== "gestor") {
+          res.writeHead(302, { Location: "/app" });
+          res.end();
+          return;
+        }
+
+        const gestor = usuarios[usuario].nombre;
+
+        await db.collection("asignaciones").updateOne(
+          { usuario, fecha },
+          {
+            $set: {
+              gestor,
+              usuario,
+              puesto,
+              fecha,
+              actualizadoPor: sesion.nombre,
+              actualizadoEn: new Date()
+            },
+            $setOnInsert: {
+              creadoPor: sesion.nombre,
+              creadoEn: new Date()
+            }
+          },
+          { upsert: true }
         );
 
         res.writeHead(302, { Location: "/app" });
@@ -920,16 +936,19 @@ if (accion === "asignar") {
       estado: "Activo"
     });
 
-const { fechaFiltro: hoyAsignacion } = fechaColombia();
+    const { fechaFiltro: hoyAsignacion } = fechaColombia();
 
-const asignacionHoy = await db.collection("asignaciones").findOne({
-  usuario: sesion.usuario,
-  fecha: hoyAsignacion
-});
+    const asignacionHoy = await db.collection("asignaciones").findOne({
+      usuario: sesion.usuario,
+      fecha: hoyAsignacion
+    });
+
+    const asignacionesHoy = await db.collection("asignaciones")
+      .find({ fecha: hoyAsignacion })
+      .toArray();
 
     const opcionesPuestos = puestos.map(p => `<option>${p}</option>`).join("");
 
-    const totalMinutas = minutas.length;
     const { fechaFiltro: hoy, mesFiltro: mesActual } = fechaColombia();
 
     const minutasHoy = minutas.filter(m => m.fechaFiltro === hoy).length;
@@ -1045,33 +1064,47 @@ const asignacionHoy = await db.collection("asignaciones").findOne({
       </form>
     `;
 
-const formularioAsignacion = `
-  <div class="panel">
-    <h2>📅 Asignar puesto</h2>
+    const formularioAsignacion = `
+      <div class="panel">
+        <h2>📅 Asignar puesto</h2>
 
-    <form method="POST">
-      <input type="hidden" name="accion" value="asignar">
+        <form method="POST">
+          <input type="hidden" name="accion" value="asignar">
 
-      <label>Gestor</label>
-      <select name="usuario" required>
-        ${Object.entries(usuarios)
-          .filter(([usuario, datos]) => datos.rol === "gestor")
-          .map(([usuario, datos]) => `<option value="${usuario}">${datos.nombre}</option>`)
-          .join("")}
-      </select>
+          <label>Gestor</label>
+          <select name="usuario" required>
+            ${Object.entries(usuarios)
+              .filter(([usuario, datos]) => datos.rol === "gestor")
+              .map(([usuario, datos]) => `<option value="${usuario}">${datos.nombre}</option>`)
+              .join("")}
+          </select>
 
-      <label>Puesto</label>
-      <select name="puesto" required>
-        ${puestos.map(p => `<option>${p}</option>`).join("")}
-      </select>
+          <label>Puesto</label>
+          <select name="puesto" required>
+            ${puestos.map(p => `<option>${p}</option>`).join("")}
+          </select>
 
-      <label>Fecha</label>
-      <input type="date" name="fecha" required>
+          <label>Fecha</label>
+          <input type="date" name="fecha" value="${hoyAsignacion}" required>
 
-      <button type="submit">Guardar asignación</button>
-    </form>
-  </div>
-`;
+          <button type="submit">Guardar asignación</button>
+        </form>
+
+        <h3>Asignaciones de hoy</h3>
+        ${
+          asignacionesHoy.length === 0
+            ? "<p>No hay asignaciones para hoy.</p>"
+            : asignacionesHoy.map(a => `
+              <div class="turno-card">
+                <p><b>${a.gestor}</b></p>
+                <p><b>Puesto:</b> ${a.puesto}</p>
+                <p><b>Fecha:</b> ${a.fecha}</p>
+                <p><b>Actualizado por:</b> ${a.actualizadoPor || a.creadoPor || ""}</p>
+              </div>
+            `).join("")
+        }
+      </div>
+    `;
 
     const dashboardSupervisor = `
       <div class="panel">
@@ -1149,12 +1182,13 @@ const formularioAsignacion = `
       </div>
     `;
 
-const asignacionHTML = asignacionHoy ? `
-  <div class="panel">
-    <h2>📍 Tu puesto asignado hoy</h2>
-    <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
-  </div>
-` : "";
+    const asignacionHTML = asignacionHoy ? `
+      <div class="panel">
+        <h2>📍 Tu puesto asignado hoy</h2>
+        <p><b>Puesto:</b> ${asignacionHoy.puesto}</p>
+        <p><b>Fecha:</b> ${asignacionHoy.fecha}</p>
+      </div>
+    ` : "";
 
     const formularioGestor = `
       ${
@@ -1226,7 +1260,8 @@ const asignacionHTML = asignacionHoy ? `
 
         <div class="contenedor">
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}         ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
+          ${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
+          ${sesion.rol === "gestor" ? asignacionHTML + formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
               <p>Aquí puedes ver todas las minutas registradas por todos los gestores.</p>
