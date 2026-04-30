@@ -971,26 +971,22 @@ const server = http.createServer(async (req, res) => {
   <title>Reporte de Minutas</title>
   ${estilos}
 
-  <script>
-    function toggle(puesto) {
-      const el = document.getElementById("grupo-" + puesto);
-      if (el.style.display === "none") {
-        el.style.display = "block";
-      } else {
-        el.style.display = "none";
-      }
-    }
-
+<script>
 function toggleHistorial(id) {
   const el = document.getElementById("historial-" + id);
 
-  if (el.style.display === "none") {
+  if (!el) {
+    alert("No encontré el historial de esta asignación");
+    return;
+  }
+
+  if (el.style.display === "none" || el.style.display === "") {
     el.style.display = "block";
   } else {
     el.style.display = "none";
   }
 }
-  </script>
+</script>
 
 </head>
       <body>
