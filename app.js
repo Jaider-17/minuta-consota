@@ -2046,138 +2046,6 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
       </form>
     `;
 
-const programacionPorGestorSupervisor = Object.entries(usuarios)
-  .filter(([usuario, datos]) => datos.rol === "gestor")
-  .map(([usuario, datos]) => {
-    const lista = asignaciones15Dias.filter(a => a.usuario === usuario);
-
-    const idGestor = usuario
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "");
-
-    return `
-      <div class="card">
-        <h3 style="cursor:pointer;" onclick="toggleProgramacion('${idGestor}')">
-          👤 ${datos.nombre} (${lista.length} días programados) ⬇
-        </h3>
-
-      <div id="grupo-programacion-${idGestor}" style="display:none;">
-
-  <div class="botones no-print" style="margin-bottom:10px;">
-    <a class="btn btn-warning" href="/exportar-programacion-excel?usuario=${usuario}">
-      📊 Descargar Excel de ${datos.nombre}
-    </a>
-<a class="btn btn-warning" href="/exportar-programacion-pdf?usuario=${usuario}">
-  📄 Descargar PDF de ${datos.nombre}
-</a>
-  </div>
-
-  ${
-    lista.length === 0
-      ? `<p>No tiene programación en los próximos 15 días.</p>`
-      : `
-        <div style="overflow-x:auto;">
-          <table style="width:100%; border-collapse:collapse; font-size:14px;">
-            <tr style="background:#eaf3ff;">
-              <th style="padding:10px;">Fecha</th>
-              <th style="padding:10px;">Puesto</th>
-              <th style="padding:10px;">Horario</th>
-              <th style="padding:10px;">Tipo</th>
-              <th style="padding:10px;">Motivo</th>
-              <th style="padding:10px;">Acciones</th>
-            </tr>
-
-            ${lista.map(a => `
-              <tr style="border-bottom:1px solid #ddd;">
-                <td style="padding:10px;">${a.fecha || ""}</td>
-                <td style="padding:10px;">${a.puesto || ""}</td>
-                <td style="padding:10px;">
-                  ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
-                </td>
-                <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
-                <td style="padding:10px;">${a.motivo || ""}</td>
-                <td style="padding:10px;">
-                  <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
-
-                  <form method="POST" style="display:inline;">
-                    <input type="hidden" name="accion" value="eliminar_asignacion">
-                    <input type="hidden" name="id" value="${a._id}">
-                    <button class="btn-danger">🗑️</button>
-                  </form>
-                </td>
-              </tr>
-            `).join("")}
-          </table>
-        </div>
-      `
-  }
-
-</div>
-      </div>
-    `;
-  })
-  .join("");
-
-const programacionPorGestorSupervisor = Object.entries(usuarios)
-  .filter(([usuario, datos]) => datos.rol === "gestor")
-  .map(([usuario, datos]) => {
-    const lista = asignaciones15Dias.filter(a => a.usuario === usuario);
-
-    const idGestor = usuario
-      .replace(/\s+/g, "-")
-      .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "");
-
-    return `
-      <div class="card">
-        <h3 style="cursor:pointer;" onclick="toggleProgramacion('${idGestor}')">
-          👤 ${datos.nombre} (${lista.length} días programados) ⬇
-        </h3>
-
-        <div id="grupo-programacion-${idGestor}" style="display:none;">
-          ${
-            lista.length === 0
-              ? `<p>No tiene programación en los próximos 15 días.</p>`
-              : `
-                <div style="overflow-x:auto;">
-                  <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                    <tr style="background:#eaf3ff;">
-                      <th style="padding:10px;">Fecha</th>
-                      <th style="padding:10px;">Puesto</th>
-                      <th style="padding:10px;">Horario</th>
-                      <th style="padding:10px;">Tipo</th>
-                      <th style="padding:10px;">Motivo</th>
-                      <th style="padding:10px;">Acciones</th>
-                    </tr>
-
-                    ${lista.map(a => `
-                      <tr style="border-bottom:1px solid #ddd;">
-                        <td style="padding:10px;">${a.fecha || ""}</td>
-                        <td style="padding:10px;">${a.puesto || ""}</td>
-                        <td style="padding:10px;">
-                          ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
-                        </td>
-                        <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
-                        <td style="padding:10px;">${a.motivo || ""}</td>
-                        <td style="padding:10px;">
-                          <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
-
-                          <form method="POST" style="display:inline;">
-                            <input type="hidden" name="accion" value="eliminar_asignacion">
-                            <input type="hidden" name="id" value="${a._id}">
-                            <button class="btn-danger">🗑️</button>
-                          </form>
-                        </td>
-                      </tr>
-                    `).join("")}
-                  </table>
-                </div>
-              `
-          }
-        </div>
-      </div>
-    `;
-  })
-  .join("");
 
     const formularioAsignacion = `
   <div class="panel">
@@ -2234,7 +2102,7 @@ const programacionPorGestorSupervisor = Object.entries(usuarios)
       <button type="submit">💾 Guardar asignación</button>
     </form>
 
-        <h3>🗓️ Programación próximos 15 días por gestor</h3>
+      <h3>🗓️ Programación próximos 15 días por gestor</h3>
 
     ${
       asignaciones15Dias.length === 0
@@ -2482,11 +2350,6 @@ const historialTurnosHTML = `
     }
 function toggleTurnos(id) {
   const el = document.getElementById("grupo-turnos-" + id);
-  if (!el) return;
-  el.style.display = el.style.display === "none" ? "block" : "none";
-}
-function toggleProgramacion(id) {
-  const el = document.getElementById("grupo-programacion-" + id);
   if (!el) return;
   el.style.display = el.style.display === "none" ? "block" : "none";
 }
