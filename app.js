@@ -2046,34 +2046,72 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
       </form>
     `;
 
-const programacionSimpleHTML = asignaciones15Dias.length === 0
-  ? "<p>No hay programación registrada para los próximos 15 días.</p>"
-  : asignaciones15Dias.map(a => {
-      const horario = a.tipoDia === "Descanso"
-        ? "Descanso"
-        : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`;
+const programacionSimpleHTML = Object.entries(usuarios)
+  .filter(([usuario, datos]) => datos.rol === "gestor")
+  .map(([usuario, datos]) => {
+    const lista = asignaciones15Dias.filter(a => a.usuario === usuario);
 
-      return `
-        <div class="turno-card">
-          <p><b>Gestor:</b> ${a.gestor || ""}</p>
-          <p><b>Fecha:</b> ${a.fecha || ""}</p>
-          <p><b>Puesto:</b> ${a.puesto || ""}</p>
-          <p><b>Horario:</b> ${horario}</p>
-          <p><b>Tipo:</b> ${a.tipoDia || "Turno"}</p>
-          <p><b>Motivo:</b> ${a.motivo || ""}</p>
+    return `
+      <details class="card">
+        <summary style="cursor:pointer; font-size:18px; font-weight:bold; color:#005baa;">
+          👤 ${datos.nombre} (${lista.length} días programados) ⬇
+        </summary>
 
-          <div class="botones no-print">
-            <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️ Editar</a>
+        <div style="margin-top:15px;">
+          <div class="botones no-print" style="margin-bottom:10px;">
+            <a class="btn btn-warning" href="/exportar-programacion-excel?usuario=${encodeURIComponent(usuario)}">
+              📊 Excel de ${datos.nombre}
+            </a>
 
-            <form method="POST" style="box-shadow:none;padding:0;margin:0;">
-              <input type="hidden" name="accion" value="eliminar_asignacion">
-              <input type="hidden" name="id" value="${a._id}">
-              <button class="btn-danger">🗑️ Eliminar</button>
-            </form>
+            <a class="btn btn-warning" href="/exportar-programacion-pdf?usuario=${encodeURIComponent(usuario)}">
+              📄 PDF de ${datos.nombre}
+            </a>
           </div>
+
+          ${
+            lista.length === 0
+              ? `<p>No tiene programación en los próximos 15 días.</p>`
+              : `
+                <div style="overflow-x:auto;">
+                  <table style="width:100%; border-collapse:collapse; font-size:14px;">
+                    <tr style="background:#eaf3ff;">
+                      <th style="padding:10px;">Fecha</th>
+                      <th style="padding:10px;">Puesto</th>
+                      <th style="padding:10px;">Horario</th>
+                      <th style="padding:10px;">Tipo</th>
+                      <th style="padding:10px;">Motivo</th>
+                      <th style="padding:10px;">Acciones</th>
+                    </tr>
+
+                    ${lista.map(a => `
+                      <tr style="border-bottom:1px solid #ddd;">
+                        <td style="padding:10px;">${a.fecha || ""}</td>
+                        <td style="padding:10px;">${a.puesto || ""}</td>
+                        <td style="padding:10px;">
+                          ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
+                        </td>
+                        <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
+                        <td style="padding:10px;">${a.motivo || ""}</td>
+                        <td style="padding:10px;">
+                          <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
+
+                          <form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
+                            <input type="hidden" name="accion" value="eliminar_asignacion">
+                            <input type="hidden" name="id" value="${a._id}">
+                            <button class="btn-danger" type="submit">🗑️</button>
+                          </form>
+                        </td>
+                      </tr>
+                    `).join("")}
+                  </table>
+                </div>
+              `
+          }
         </div>
-      `;
-    }).join("");
+      </details>
+    `;
+  })
+  .join("");
 
     const formularioAsignacion = `
   <div class="panel">
