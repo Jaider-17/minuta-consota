@@ -1776,29 +1776,62 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
       </div>
     `;
 
-    const historialTurnosHTML = `
-      <div class="panel">
-        <h2>🕒 Historial de turnos cerrados</h2>
-        ${
-          turnosCerrados.length === 0
-            ? "<p>No hay turnos cerrados todavía.</p>"
-            : turnosCerrados.map(t => `
-              <div class="turno-card">
-                <p><b>${t.gestor}</b></p>
-                <p><b>Puesto:</b> ${t.puesto || ""}</p>
-                <p><b>Entrada:</b> ${t.fecha || ""} - ${t.horaEntrada || ""}</p>
-                <p><b>Salida:</b> ${t.fechaSalida || ""} - ${t.horaSalida || ""}</p>
-                <p><b>Tiempo trabajado:</b> ${t.tiempoTrabajado || `${t.horasTrabajadas || 0} horas`}</p>
-<p><b>Horario programado:</b> ${t.horarioProgramado || "Sin horario"}</p>
-<p><b>Cumplimiento:</b> ${t.estadoCumplimiento || "No analizado"}</p>
-<p><b>Detalle:</b> ${t.resumenCumplimiento || ""}</p>
+    const turnosPorGestor = {};
 
-                <p><b>Estado:</b> ${t.estado}</p>
+turnosCerrados.forEach(t => {
+  const gestor = t.gestor || "Sin gestor";
+
+  if (!turnosPorGestor[gestor]) {
+    turnosPorGestor[gestor] = [];
+  }
+
+  turnosPorGestor[gestor].push(t);
+});
+
+const historialTurnosHTML = `
+  <div class="panel">
+    <h2>🕒 Historial de turnos cerrados por gestor</h2>
+
+    ${
+      Object.keys(turnosPorGestor).length === 0
+        ? "<p>No hay turnos cerrados todavía.</p>"
+        : Object.entries(turnosPorGestor).map(([gestor, lista]) => {
+            const totalHoras = lista.reduce((acc, t) => acc + (Number(t.horasTrabajadas) || 0), 0);
+
+            const idGestor = gestor
+              .replace(/\s+/g, "-")
+              .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "");
+
+            return `
+              <div class="card">
+                <h3 style="cursor:pointer;" onclick="toggleTurnos('${idGestor}')">
+                  👤 ${gestor} (${lista.length} turnos) ⬇
+                </h3>
+
+                <div id="grupo-turnos-${idGestor}" style="display:none;">
+                  ${lista.map(t => `
+                    <div class="turno-card">
+                      <p><b>Puesto:</b> ${t.puesto || ""}</p>
+                      <p><b>Entrada:</b> ${t.fecha || ""} - ${t.horaEntrada || ""}</p>
+                      <p><b>Salida:</b> ${t.fechaSalida || ""} - ${t.horaSalida || ""}</p>
+                      <p><b>Tiempo trabajado:</b> ${t.tiempoTrabajado || `${t.horasTrabajadas || 0} horas`}</p>
+                      <p><b>Horario programado:</b> ${t.horarioProgramado || "Sin horario"}</p>
+                      <p><b>Cumplimiento:</b> ${t.estadoCumplimiento || "No analizado"}</p>
+                      <p><b>Detalle:</b> ${t.resumenCumplimiento || ""}</p>
+                      <p><b>Estado:</b> ${t.estado || ""}</p>
+                    </div>
+                  `).join("")}
+
+                  <div class="contador">
+                    Total de horas trabajadas: ${totalHoras.toFixed(2)} horas
+                  </div>
+                </div>
               </div>
-            `).join("")
-        }
-      </div>
-    `;
+            `;
+          }).join("")
+    }
+  </div>
+`;
 
   const programacionGestorHTML = `
   <div class="panel">
@@ -1908,6 +1941,11 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
 
       el.style.display = el.style.display === "none" ? "block" : "none";
     }
+function toggleTurnos(id) {
+  const el = document.getElementById("grupo-turnos-" + id);
+  if (!el) return;
+  el.style.display = el.style.display === "none" ? "block" : "none";
+}
   </script>
 </head>
 
