@@ -980,6 +980,16 @@ const server = http.createServer(async (req, res) => {
         el.style.display = "none";
       }
     }
+
+function toggleHistorial(id) {
+  const el = document.getElementById("historial-" + id);
+
+  if (el.style.display === "none") {
+    el.style.display = "block";
+  } else {
+    el.style.display = "none";
+  }
+}
   </script>
 
 </head>
@@ -2195,6 +2205,7 @@ const programacionSimpleHTML = Object.entries(usuarios)
                       <th style="padding:10px;">Tipo</th>
                       <th style="padding:10px;">Motivo</th>
                       <th style="padding:10px;">Acciones</th>
+<th style="padding:10px;">Historial</th>
                     </tr>
 
                     ${lista.map(a => `
@@ -2206,6 +2217,23 @@ const programacionSimpleHTML = Object.entries(usuarios)
                         </td>
                         <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
                         <td style="padding:10px;">${a.motivo || ""}</td>
+<td style="padding:10px;">
+  <button class="btn" onclick="toggleHistorial('${a._id}')">📜 Ver</button>
+
+  <div id="historial-${a._id}" style="display:none; margin-top:10px; font-size:12px;">
+    ${
+      (a.historialCambios || []).length === 0
+        ? "<p>No hay historial</p>"
+        : a.historialCambios.map(h => `
+          <div style="border:1px solid #ddd; padding:6px; margin-bottom:6px; border-radius:6px;">
+            <b>${h.accion}</b><br>
+            👤 ${h.nombreAccion}<br>
+            🕒 ${new Date(h.fechaAccion).toLocaleString()}<br>
+          </div>
+        `).join("")
+    }
+  </div>
+</td>
                         <td style="padding:10px;">
                           <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
 
