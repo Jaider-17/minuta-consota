@@ -1884,6 +1884,36 @@ minutasOrdenadas.forEach(m => {
   minutasPorPuestoApp[puesto].push(m);
 });
 
+const iconoTipoMinuta = (tipo = "") => {
+  const t = String(tipo).toLowerCase();
+
+  if (t.includes("inicio")) return "🟢";
+  if (t.includes("ronda")) return "🔵";
+  if (t.includes("emergencia")) return "🚨";
+  if (t.includes("daño")) return "⚠️";
+  if (t.includes("entrega")) return "🔴";
+
+  return "📝";
+};
+
+const colorLineaMinuta = (tipo = "", novedad = "") => {
+  const texto = `${tipo} ${novedad}`.toLowerCase();
+
+  if (texto.includes("emergencia") || texto.includes("robo") || texto.includes("accidente") || texto.includes("urgente")) {
+    return "#dc2626";
+  }
+
+  if (texto.includes("daño") || texto.includes("problema") || texto.includes("falla")) {
+    return "#f59e0b";
+  }
+
+  if (texto.includes("inicio")) return "#16a34a";
+  if (texto.includes("entrega")) return "#ef4444";
+  if (texto.includes("ronda")) return "#2563eb";
+
+  return "#005baa";
+};
+
 const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
   <div class="card">
     <h3 style="cursor:pointer;" onclick="toggleGrupoMinutas('${puesto.replace(/'/g, "\\'")}')">
@@ -1891,53 +1921,78 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
     </h3>
 
     <div id="grupo-minutas-${puesto.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "")}" style="display:none;">
-<div class="botones no-print" style="margin-bottom:10px;">
-  <a class="btn btn-warning" href="/exportar-excel?puesto=${puesto}">
-    📊 Excel ${puesto}
-  </a>
 
-  <a class="btn btn-warning" href="/exportar-pdf?puesto=${puesto}">
-    📄 PDF ${puesto}
-  </a>
-</div>
-      ${lista.map(m => {
-        const alerta = detectarAlerta(m.novedad);
-        const estadoTexto = m.estado || "Pendiente";
-        const claseEstado = estadoTexto === "Revisada" ? "estado-revisada" : "";
+      <div class="botones no-print" style="margin-bottom:15px;">
+        <a class="btn btn-warning" href="/exportar-excel?puesto=${puesto}">📊 Excel ${puesto}</a>
+        <a class="btn btn-warning" href="/exportar-pdf?puesto=${puesto}">📄 PDF ${puesto}</a>
+      </div>
 
-        return `
-          <div class="turno-card ${alerta.clase}">
-            <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
-            ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
-            <p><b>Gestor:</b> ${m.gestor || ""}</p>
-            <p><b>Tipo:</b> ${m.tipo || ""}</p>
-            <p><b>Estado:</b> <span class="${claseEstado}">${estadoTexto}</span></p>
-            ${m.revisadaPor ? `<p><b>Revisada por:</b> ${m.revisadaPor}</p>` : ""}
-            <p><b>Novedad:</b> ${m.novedad || ""}</p>
-            ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
+      <div style="border-left:4px solid #cbd5e1; margin-left:15px; padding-left:18px;">
+        ${lista.map(m => {
+          const alerta = detectarAlerta(m.novedad);
+          const estadoTexto = m.estado || "Pendiente";
+          const claseEstado = estadoTexto === "Revisada" ? "estado-revisada" : "";
+          const colorLinea = colorLineaMinuta(m.tipo, m.novedad);
+          const icono = iconoTipoMinuta(m.tipo);
 
-            ${sesion.rol === "supervisor" ? `
-              <div class="botones no-print" style="margin-top:10px;">
-                <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
-
-                ${(m.estado || "Pendiente") === "Pendiente" ? `
-                  <form method="POST" style="box-shadow:none;padding:0;margin:0;">
-                    <input type="hidden" name="accion" value="revisada">
-                    <input type="hidden" name="id" value="${m._id}">
-                    <button class="btn-success" type="submit">✅ Marcar revisada</button>
-                  </form>
-                ` : ""}
-
-                <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
-                  <input type="hidden" name="accion" value="eliminar">
-                  <input type="hidden" name="id" value="${m._id}">
-                  <button class="btn-danger" type="submit">🗑️ Eliminar</button>
-                </form>
+          return `
+            <div class="turno-card ${alerta.clase}" style="position:relative; margin-bottom:16px; border-left:5px solid ${colorLinea};">
+              
+              <div style="
+                position:absolute;
+                left:-39px;
+                top:14px;
+                width:30px;
+                height:30px;
+                border-radius:50%;
+                background:${colorLinea};
+                color:white;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                font-size:15px;
+                box-shadow:0 2px 8px rgba(0,0,0,0.25);
+              ">
+                ${icono}
               </div>
-            ` : ""}
-          </div>
-        `;
-      }).join("")}
+
+              <div class="fecha">
+                🕒 ${m.fecha || ""} - ${m.hora || ""}
+              </div>
+
+              ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
+
+              <p><b>Gestor:</b> ${m.gestor || ""}</p>
+              <p><b>Tipo:</b> ${m.tipo || ""}</p>
+              <p><b>Estado:</b> <span class="${claseEstado}">${estadoTexto}</span></p>
+              ${m.revisadaPor ? `<p><b>Revisada por:</b> ${m.revisadaPor}</p>` : ""}
+              <p><b>Novedad:</b> ${m.novedad || ""}</p>
+
+              ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
+
+              ${sesion.rol === "supervisor" ? `
+                <div class="botones no-print" style="margin-top:10px;">
+                  <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
+
+                  ${(m.estado || "Pendiente") === "Pendiente" ? `
+                    <form method="POST" style="box-shadow:none;padding:0;margin:0;">
+                      <input type="hidden" name="accion" value="revisada">
+                      <input type="hidden" name="id" value="${m._id}">
+                      <button class="btn-success" type="submit">✅ Marcar revisada</button>
+                    </form>
+                  ` : ""}
+
+                  <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
+                    <input type="hidden" name="accion" value="eliminar">
+                    <input type="hidden" name="id" value="${m._id}">
+                    <button class="btn-danger" type="submit">🗑️ Eliminar</button>
+                  </form>
+                </div>
+              ` : ""}
+            </div>
+          `;
+        }).join("")}
+      </div>
     </div>
   </div>
 `).join("");
