@@ -1504,45 +1504,72 @@ const miProgramacion15Dias = await db.collection("asignaciones")
       horasPorGestor[t.gestor] = (horasPorGestor[t.gestor] || 0) + (t.horasTrabajadas || 0);
     });
 
-    const historial = [...minutas].reverse().map(m => {
-      const alerta = detectarAlerta(m.novedad);
-      const estadoTexto = m.estado || "Pendiente";
-      const claseEstado = estadoTexto === "Revisada" ? "estado-revisada" : "";
+ const minutasOrdenadas = [...minutas].sort((a, b) => {
+  const fechaA = `${a.fechaFiltro || ""} ${a.hora || ""}`;
+  const fechaB = `${b.fechaFiltro || ""} ${b.hora || ""}`;
+  return fechaB.localeCompare(fechaA);
+});
 
-      return `
-        <div class="card ${alerta.clase}">
-          <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
-          <h3>${m.puesto || ""}</h3>
-          ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
-          <p><b>Gestor:</b> ${m.gestor || ""}</p>
-          <p><b>Tipo:</b> ${m.tipo || ""}</p>
-          <p><b>Estado:</b> <span class="${claseEstado}">${estadoTexto}</span></p>
-          ${m.revisadaPor ? `<p><b>Revisada por:</b> ${m.revisadaPor}</p>` : ""}
-          <p><b>Novedad:</b> ${m.novedad || ""}</p>
-          ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
+const minutasPorPuestoApp = {};
 
-          ${sesion.rol === "supervisor" ? `
-            <div class="botones no-print" style="margin-top:10px;">
-              <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
+minutasOrdenadas.forEach(m => {
+  const puesto = m.puesto || "Sin puesto";
 
-              ${(m.estado || "Pendiente") === "Pendiente" ? `
-                <form method="POST" style="box-shadow:none;padding:0;margin:0;">
-                  <input type="hidden" name="accion" value="revisada">
+  if (!minutasPorPuestoApp[puesto]) {
+    minutasPorPuestoApp[puesto] = [];
+  }
+
+  minutasPorPuestoApp[puesto].push(m);
+});
+
+const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
+  <div class="card">
+    <h3 style="cursor:pointer;" onclick="toggleGrupoMinutas('${puesto.replace(/'/g, "\\'")}')">
+      📍 ${puesto} (${lista.length}) ⬇
+    </h3>
+
+    <div id="grupo-minutas-${puesto.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "")}" style="display:none;">
+      ${lista.map(m => {
+        const alerta = detectarAlerta(m.novedad);
+        const estadoTexto = m.estado || "Pendiente";
+        const claseEstado = estadoTexto === "Revisada" ? "estado-revisada" : "";
+
+        return `
+          <div class="turno-card ${alerta.clase}">
+            <div class="fecha">${m.fecha || ""} - ${m.hora || ""}</div>
+            ${alerta.etiqueta ? `<div class="etiqueta">${alerta.etiqueta}</div>` : ""}
+            <p><b>Gestor:</b> ${m.gestor || ""}</p>
+            <p><b>Tipo:</b> ${m.tipo || ""}</p>
+            <p><b>Estado:</b> <span class="${claseEstado}">${estadoTexto}</span></p>
+            ${m.revisadaPor ? `<p><b>Revisada por:</b> ${m.revisadaPor}</p>` : ""}
+            <p><b>Novedad:</b> ${m.novedad || ""}</p>
+            ${m.foto ? `<img class="foto" src="${m.foto}" alt="Foto evidencia">` : ""}
+
+            ${sesion.rol === "supervisor" ? `
+              <div class="botones no-print" style="margin-top:10px;">
+                <a class="btn btn-warning" href="/editar?id=${m._id}">✏️ Editar</a>
+
+                ${(m.estado || "Pendiente") === "Pendiente" ? `
+                  <form method="POST" style="box-shadow:none;padding:0;margin:0;">
+                    <input type="hidden" name="accion" value="revisada">
+                    <input type="hidden" name="id" value="${m._id}">
+                    <button class="btn-success" type="submit">✅ Marcar revisada</button>
+                  </form>
+                ` : ""}
+
+                <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
+                  <input type="hidden" name="accion" value="eliminar">
                   <input type="hidden" name="id" value="${m._id}">
-                  <button class="btn-success" type="submit">✅ Marcar revisada</button>
+                  <button class="btn-danger" type="submit">🗑️ Eliminar</button>
                 </form>
-              ` : ""}
-
-              <form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar esta minuta?');" style="box-shadow:none;padding:0;margin:0;">
-                <input type="hidden" name="accion" value="eliminar">
-                <input type="hidden" name="id" value="${m._id}">
-                <button class="btn-danger" type="submit">🗑️ Eliminar</button>
-              </form>
-            </div>
-          ` : ""}
-        </div>
-      `;
-    }).join("");
+              </div>
+            ` : ""}
+          </div>
+        `;
+      }).join("")}
+    </div>
+  </div>
+`).join("");
 
     const gestoresSistema = Object.values(usuarios)
       .filter(u => u.rol === "gestor")
@@ -1862,10 +1889,27 @@ const miProgramacion15Dias = await db.collection("asignaciones")
 
     enviarHTML(res, `
       <html>
-      <head>
-        <title>Minuta Consotá</title>
-        ${estilos}
-      </head>
+     <head>
+  <title>Minuta Consotá</title>
+  ${estilos}
+
+  <script>
+    function normalizarId(texto) {
+      return String(texto)
+        .replace(/\\s+/g, "-")
+        .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "");
+    }
+
+    function toggleGrupoMinutas(puesto) {
+      const id = "grupo-minutas-" + normalizarId(puesto);
+      const el = document.getElementById(id);
+
+      if (!el) return;
+
+      el.style.display = el.style.display === "none" ? "block" : "none";
+    }
+  </script>
+</head>
 
       <body>
         <header>
