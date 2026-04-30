@@ -640,6 +640,109 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.url.startsWith("/exportar-programacion-pdf")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const usuarioFiltro = url.searchParams.get("usuario") || "";
+
+    const diasProgramacion = proximosDiasColombia(15);
+    const fechasProgramacion = diasProgramacion.map(d => d.fecha);
+
+    const filtro = {
+      fecha: { $in: fechasProgramacion }
+    };
+
+    if (usuarioFiltro) {
+      filtro.usuario = usuarioFiltro;
+    }
+
+    const asignaciones = await db.collection("asignaciones")
+      .find(filtro)
+      .sort({ gestor: 1, fecha: 1 })
+      .toArray();
+
+    const titulo = usuarioFiltro && usuarios[usuarioFiltro]
+      ? `Programación de ${usuarios[usuarioFiltro].nombre}`
+      : "Programación general próximos 15 días";
+
+    const filas = asignaciones.map(a => `
+      <tr>
+        <td>${a.fecha || ""}</td>
+        <td>${a.gestor || ""}</td>
+        <td>${a.puesto || ""}</td>
+        <td>${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}</td>
+        <td>${a.tipoDia || "Turno"}</td>
+        <td>${a.motivo || ""}</td>
+        <td>${a.esEmergencia ? "Sí" : "No"}</td>
+      </tr>
+    `).join("");
+
+    enviarHTML(res, `
+      <html>
+      <head>
+        <title>${titulo}</title>
+        ${estilos}
+        <style>
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+          }
+
+          th, td {
+            border: 1px solid #ddd;
+            padding: 8px;
+            text-align: left;
+          }
+
+          th {
+            background: #eaf3ff;
+            color: #005baa;
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="contenedor">
+          <h1>${titulo}</h1>
+          <p>Total registros: ${asignaciones.length}</p>
+
+          <button onclick="window.print()">📄 Descargar / Imprimir PDF</button>
+
+          ${
+            asignaciones.length === 0
+              ? "<p>No hay programación para exportar.</p>"
+              : `
+                <table>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Gestor</th>
+                    <th>Puesto</th>
+                    <th>Horario</th>
+                    <th>Tipo</th>
+                    <th>Motivo</th>
+                    <th>Emergencia</th>
+                  </tr>
+                  ${filas}
+                </table>
+              `
+          }
+
+          <br>
+          <a href="/app">⬅ Volver</a>
+        </div>
+      </body>
+      </html>
+    `);
+
+    return;
+  }
+
   if (req.url.startsWith("/exportar-pdf")) {
     if (!sesion || sesion.rol !== "supervisor") {
       res.writeHead(302, { Location: "/" });
@@ -1706,6 +1809,9 @@ const programacionPorGestorSupervisor = Object.entries(usuarios)
     <a class="btn btn-warning" href="/exportar-programacion-excel?usuario=${usuario}">
       📊 Descargar Excel de ${datos.nombre}
     </a>
+<a class="btn btn-warning" href="/exportar-programacion-pdf?usuario=${usuario}">
+  📄 Descargar PDF de ${datos.nombre}
+</a>
   </div>
 
   ${
@@ -1762,6 +1868,7 @@ const programacionPorGestorSupervisor = Object.entries(usuarios)
 <div class="botones no-print" style="margin-bottom:15px;">
   <a class="btn btn-success" href="/programar-rango">📆 Programar varios días</a>
   <a class="btn btn-warning" href="/exportar-programacion-excel">📊 Descargar programación Excel</a>
+<a class="btn btn-warning" href="/exportar-programacion-pdf">📄 Descargar programación PDF</a>
 </div>
 
     <form method="POST">
