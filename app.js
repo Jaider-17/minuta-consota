@@ -640,6 +640,181 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.url.startsWith("/exportar-turnos-excel")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const gestorFiltro = url.searchParams.get("gestor") || "";
+
+    const filtro = { estado: "Cerrado" };
+
+    if (gestorFiltro) {
+      filtro.gestor = gestorFiltro;
+    }
+
+    const turnos = await db.collection("turnos")
+      .find(filtro)
+      .sort({ cerradoEn: -1 })
+      .toArray();
+
+    const totalHoras = turnos.reduce((acc, t) => acc + (Number(t.horasTrabajadas) || 0), 0);
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Turnos cerrados");
+
+    worksheet.columns = [
+      { header: "Gestor", key: "gestor", width: 25 },
+      { header: "Puesto", key: "puesto", width: 22 },
+      { header: "Fecha entrada", key: "fecha", width: 18 },
+      { header: "Hora entrada", key: "horaEntrada", width: 18 },
+      { header: "Fecha salida", key: "fechaSalida", width: 18 },
+      { header: "Hora salida", key: "horaSalida", width: 18 },
+      { header: "Tiempo trabajado", key: "tiempoTrabajado", width: 25 },
+      { header: "Horas trabajadas", key: "horasTrabajadas", width: 18 },
+      { header: "Horario programado", key: "horarioProgramado", width: 25 },
+      { header: "Cumplimiento", key: "estadoCumplimiento", width: 30 },
+      { header: "Detalle", key: "resumenCumplimiento", width: 40 }
+    ];
+
+    turnos.forEach(t => {
+      worksheet.addRow({
+        gestor: t.gestor || "",
+        puesto: t.puesto || "",
+        fecha: t.fecha || "",
+        horaEntrada: t.horaEntrada || "",
+        fechaSalida: t.fechaSalida || "",
+        horaSalida: t.horaSalida || "",
+        tiempoTrabajado: t.tiempoTrabajado || "",
+        horasTrabajadas: Number(t.horasTrabajadas || 0),
+        horarioProgramado: t.horarioProgramado || "Sin horario",
+        estadoCumplimiento: t.estadoCumplimiento || "No analizado",
+        resumenCumplimiento: t.resumenCumplimiento || ""
+      });
+    });
+
+    worksheet.addRow({});
+    worksheet.addRow({
+      gestor: "TOTAL HORAS",
+      horasTrabajadas: Number(totalHoras.toFixed(2))
+    });
+
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": "attachment; filename=turnos-cerrados.xlsx"
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+    return;
+  }
+
+  if (req.url.startsWith("/exportar-turnos-pdf")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const gestorFiltro = url.searchParams.get("gestor") || "";
+
+    const filtro = { estado: "Cerrado" };
+
+    if (gestorFiltro) {
+      filtro.gestor = gestorFiltro;
+    }
+
+    const turnos = await db.collection("turnos")
+      .find(filtro)
+      .sort({ cerradoEn: -1 })
+      .toArray();
+
+    const totalHoras = turnos.reduce((acc, t) => acc + (Number(t.horasTrabajadas) || 0), 0);
+
+    const titulo = gestorFiltro
+      ? `Turnos cerrados de ${gestorFiltro}`
+      : "Turnos cerrados generales";
+
+    const filas = turnos.map(t => `
+      <tr>
+        <td>${t.gestor || ""}</td>
+        <td>${t.puesto || ""}</td>
+        <td>${t.fecha || ""} - ${t.horaEntrada || ""}</td>
+        <td>${t.fechaSalida || ""} - ${t.horaSalida || ""}</td>
+        <td>${t.tiempoTrabajado || ""}</td>
+        <td>${Number(t.horasTrabajadas || 0).toFixed(2)}</td>
+        <td>${t.horarioProgramado || "Sin horario"}</td>
+        <td>${t.estadoCumplimiento || "No analizado"}</td>
+      </tr>
+    `).join("");
+
+    enviarHTML(res, `
+      <html>
+      <head>
+        <title>${titulo}</title>
+        ${estilos}
+        <style>
+          table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 12px;
+          }
+
+          th, td {
+            border: 1px solid #ddd;
+            padding: 7px;
+            text-align: left;
+          }
+
+          th {
+            background: #eaf3ff;
+            color: #005baa;
+          }
+        </style>
+      </head>
+
+      <body>
+        <div class="contenedor">
+          <h1>${titulo}</h1>
+          <p><b>Total turnos:</b> ${turnos.length}</p>
+          <p><b>Total horas trabajadas:</b> ${totalHoras.toFixed(2)} horas</p>
+
+          <button onclick="window.print()">📄 Descargar / Imprimir PDF</button>
+
+          ${
+            turnos.length === 0
+              ? "<p>No hay turnos cerrados para exportar.</p>"
+              : `
+                <table>
+                  <tr>
+                    <th>Gestor</th>
+                    <th>Puesto</th>
+                    <th>Entrada</th>
+                    <th>Salida</th>
+                    <th>Tiempo</th>
+                    <th>Horas</th>
+                    <th>Horario</th>
+                    <th>Cumplimiento</th>
+                  </tr>
+                  ${filas}
+                </table>
+              `
+          }
+
+          <br>
+          <a href="/app">⬅ Volver</a>
+        </div>
+      </body>
+      </html>
+    `);
+
+    return;
+  }
+
   if (req.url.startsWith("/exportar-programacion-pdf")) {
     if (!sesion || sesion.rol !== "supervisor") {
       res.writeHead(302, { Location: "/" });
@@ -1102,6 +1277,25 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
         },
         { upsert: true }
       );
+
+      res.writeHead(302, { Location: "/app" });
+      res.end();
+      return;
+    }
+
+    if (accion === "eliminar_turno") {
+      if (!sesion || sesion.rol !== "supervisor") {
+        res.writeHead(302, { Location: "/" });
+        res.end();
+        return;
+      }
+
+      const id = form.get("id");
+
+      await db.collection("turnos").deleteOne({
+        _id: new ObjectId(id),
+        estado: "Cerrado"
+      });
 
       res.writeHead(302, { Location: "/app" });
       res.end();
@@ -1998,6 +2192,11 @@ const historialTurnosHTML = `
   <div class="panel">
     <h2>🕒 Historial de turnos cerrados por gestor</h2>
 
+<div class="botones no-print" style="margin-bottom:15px;">
+  <a class="btn btn-warning" href="/exportar-turnos-excel">📊 Descargar turnos Excel</a>
+  <a class="btn btn-warning" href="/exportar-turnos-pdf">📄 Descargar turnos PDF</a>
+</div>
+
     ${
       Object.keys(turnosPorGestor).length === 0
         ? "<p>No hay turnos cerrados todavía.</p>"
@@ -2015,6 +2214,10 @@ const historialTurnosHTML = `
                 </h3>
 
                 <div id="grupo-turnos-${idGestor}" style="display:none;">
+<div class="botones no-print" style="margin-bottom:10px;">
+  <a class="btn btn-warning" href="/exportar-turnos-excel?gestor=${gestor}">📊 Excel de ${gestor}</a>
+  <a class="btn btn-warning" href="/exportar-turnos-pdf?gestor=${gestor}">📄 PDF de ${gestor}</a>
+</div>
                   ${lista.map(t => `
                     <div class="turno-card">
                       <p><b>Puesto:</b> ${t.puesto || ""}</p>
@@ -2025,6 +2228,11 @@ const historialTurnosHTML = `
                       <p><b>Cumplimiento:</b> ${t.estadoCumplimiento || "No analizado"}</p>
                       <p><b>Detalle:</b> ${t.resumenCumplimiento || ""}</p>
                       <p><b>Estado:</b> ${t.estado || ""}</p>
+<form method="POST" onsubmit="return confirm('¿Seguro que deseas eliminar este turno cerrado?');" style="box-shadow:none;padding:0;margin:0;">
+  <input type="hidden" name="accion" value="eliminar_turno">
+  <input type="hidden" name="id" value="${t._id}">
+  <button class="btn-danger" type="submit">🗑️ Eliminar turno</button>
+</form>
                     </div>
                   `).join("")}
 
