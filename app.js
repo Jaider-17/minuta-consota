@@ -1700,47 +1700,55 @@ const programacionPorGestorSupervisor = Object.entries(usuarios)
           👤 ${datos.nombre} (${lista.length} días programados) ⬇
         </h3>
 
-        <div id="grupo-programacion-${idGestor}" style="display:none;">
-          ${
-            lista.length === 0
-              ? `<p>No tiene programación en los próximos 15 días.</p>`
-              : `
-                <div style="overflow-x:auto;">
-                  <table style="width:100%; border-collapse:collapse; font-size:14px;">
-                    <tr style="background:#eaf3ff;">
-                      <th style="padding:10px;">Fecha</th>
-                      <th style="padding:10px;">Puesto</th>
-                      <th style="padding:10px;">Horario</th>
-                      <th style="padding:10px;">Tipo</th>
-                      <th style="padding:10px;">Motivo</th>
-                      <th style="padding:10px;">Acciones</th>
-                    </tr>
+      <div id="grupo-programacion-${idGestor}" style="display:none;">
 
-                    ${lista.map(a => `
-                      <tr style="border-bottom:1px solid #ddd;">
-                        <td style="padding:10px;">${a.fecha || ""}</td>
-                        <td style="padding:10px;">${a.puesto || ""}</td>
-                        <td style="padding:10px;">
-                          ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
-                        </td>
-                        <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
-                        <td style="padding:10px;">${a.motivo || ""}</td>
-                        <td style="padding:10px;">
-                          <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
+  <div class="botones no-print" style="margin-bottom:10px;">
+    <a class="btn btn-warning" href="/exportar-programacion-excel?usuario=${usuario}">
+      📊 Descargar Excel de ${datos.nombre}
+    </a>
+  </div>
 
-                          <form method="POST" style="display:inline;">
-                            <input type="hidden" name="accion" value="eliminar_asignacion">
-                            <input type="hidden" name="id" value="${a._id}">
-                            <button class="btn-danger">🗑️</button>
-                          </form>
-                        </td>
-                      </tr>
-                    `).join("")}
-                  </table>
-                </div>
-              `
-          }
+  ${
+    lista.length === 0
+      ? `<p>No tiene programación en los próximos 15 días.</p>`
+      : `
+        <div style="overflow-x:auto;">
+          <table style="width:100%; border-collapse:collapse; font-size:14px;">
+            <tr style="background:#eaf3ff;">
+              <th style="padding:10px;">Fecha</th>
+              <th style="padding:10px;">Puesto</th>
+              <th style="padding:10px;">Horario</th>
+              <th style="padding:10px;">Tipo</th>
+              <th style="padding:10px;">Motivo</th>
+              <th style="padding:10px;">Acciones</th>
+            </tr>
+
+            ${lista.map(a => `
+              <tr style="border-bottom:1px solid #ddd;">
+                <td style="padding:10px;">${a.fecha || ""}</td>
+                <td style="padding:10px;">${a.puesto || ""}</td>
+                <td style="padding:10px;">
+                  ${a.tipoDia === "Descanso" ? "Descanso" : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`}
+                </td>
+                <td style="padding:10px;">${a.tipoDia || "Turno"}</td>
+                <td style="padding:10px;">${a.motivo || ""}</td>
+                <td style="padding:10px;">
+                  <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️</a>
+
+                  <form method="POST" style="display:inline;">
+                    <input type="hidden" name="accion" value="eliminar_asignacion">
+                    <input type="hidden" name="id" value="${a._id}">
+                    <button class="btn-danger">🗑️</button>
+                  </form>
+                </td>
+              </tr>
+            `).join("")}
+          </table>
         </div>
+      `
+  }
+
+</div>
       </div>
     `;
   })
