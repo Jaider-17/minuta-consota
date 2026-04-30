@@ -1079,6 +1079,66 @@ const server = http.createServer(async (req, res) => {
         return;
       }
 
+const asignacionHoyTurno = await db.collection("asignaciones").findOne({
+  usuario: sesion.usuario,
+  fecha: fechaFiltro
+});
+
+if (!asignacionHoyTurno) {
+  enviarHTML(res, `
+    <html>
+    <head>${estilos}</head>
+    <body>
+      <div class="contenedor">
+        <div class="card alerta-roja">
+          <h2>🚫 No puedes iniciar turno</h2>
+          <p>No tienes programación asignada para hoy.</p>
+          <a class="btn" href="/app">⬅ Volver</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  return;
+}
+
+if ((asignacionHoyTurno.tipoDia || "Turno") !== "Turno") {
+  enviarHTML(res, `
+    <html>
+    <head>${estilos}</head>
+    <body>
+      <div class="contenedor">
+        <div class="card alerta-roja">
+          <h2>🚫 No puedes iniciar turno</h2>
+          <p>Hoy estás registrado como: <b>${asignacionHoyTurno.tipoDia}</b>.</p>
+          <a class="btn" href="/app">⬅ Volver</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  return;
+}
+
+if (asignacionHoyTurno.puesto !== puesto) {
+  enviarHTML(res, `
+    <html>
+    <head>${estilos}</head>
+    <body>
+      <div class="contenedor">
+        <div class="card alerta-roja">
+          <h2>🚫 Puesto incorrecto</h2>
+          <p>Hoy estás asignado a: <b>${asignacionHoyTurno.puesto}</b></p>
+          <p>No puedes iniciar turno en: <b>${puesto}</b></p>
+          <a class="btn" href="/app">⬅ Volver</a>
+        </div>
+      </div>
+    </body>
+    </html>
+  `);
+  return;
+}
+
 const turno = {
   gestor: sesion.nombre,
   usuario: sesion.usuario,
@@ -1088,10 +1148,11 @@ const turno = {
   horaEntrada: hora,
   tipoTurno: obtenerTipoTurno(),
   estado: "Activo",
+  asignacionId: asignacionHoyTurno._id,
   creadoEn: new Date()
 };
 
-      await db.collection("turnos").insertOne(turno);
+await db.collection("turnos").insertOne(turno);
 
       res.writeHead(302, { Location: "/app" });
       res.end();
@@ -1252,7 +1313,30 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
         return;
       }
 
-      const gestor = usuarios[usuario].nombre;
+          const gestor = usuarios[usuario].nombre;
+
+      const asignacionAnterior = await db.collection("asignaciones").findOne({
+        usuario,
+        fecha
+      });
+
+      const auditoria = {
+        accion: asignacionAnterior ? "Actualizó asignación" : "Creó asignación",
+        usuarioAccion: sesion.usuario,
+        nombreAccion: sesion.nombre,
+        rolAccion: sesion.rol,
+        fechaAccion: new Date(),
+        cambios: {
+          gestor,
+          puesto,
+          fecha,
+          horaInicioProgramada,
+          horaFinProgramada,
+          tipoDia,
+          motivo,
+          esEmergencia: emergencia
+        }
+      };
 
       await db.collection("asignaciones").updateOne(
         { usuario, fecha },
@@ -1270,10 +1354,14 @@ const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salid
             actualizadoPor: sesion.nombre,
             actualizadoEn: new Date()
           },
-          $setOnInsert: {
-            creadoPor: sesion.nombre,
-            creadoEn: new Date()
-          }
+         $push: {
+  historialCambios: auditoria
+},
+$setOnInsert: {
+  creadoPor: sesion.nombre,
+  creadoPorUsuario: sesion.usuario,
+  creadoEn: new Date()
+}
         },
         { upsert: true }
       );
@@ -1344,23 +1432,49 @@ if (accion === "actualizar_asignacion") {
     return;
   }
 
+const asignacionAnterior = await db.collection("asignaciones").findOne({
+  _id: new ObjectId(id)
+});
+
+const auditoria = {
+  accion: "Editó asignación",
+  usuarioAccion: sesion.usuario,
+  nombreAccion: sesion.nombre,
+  rolAccion: sesion.rol,
+  fechaAccion: new Date(),
+  antes: asignacionAnterior || null,
+  cambios: {
+    usuario,
+    gestor: usuarios[usuario].nombre,
+    puesto,
+    fecha,
+    horaInicioProgramada,
+    horaFinProgramada,
+    tipoDia,
+    motivo,
+    esEmergencia: emergencia
+  }
+};
 
   await db.collection("asignaciones").updateOne(
     { _id: new ObjectId(id) },
     {
-      $set: {
-        usuario,
-        gestor: usuarios[usuario].nombre,
-        puesto,
-        fecha,
-        horaInicioProgramada,
-        horaFinProgramada,
-        tipoDia,
-        motivo,
-        esEmergencia: emergencia,
-        actualizadoPor: sesion.nombre,
-        actualizadoEn: new Date()
-      }
+     $set: {
+  usuario,
+  gestor: usuarios[usuario].nombre,
+  puesto,
+  fecha,
+  horaInicioProgramada,
+  horaFinProgramada,
+  tipoDia,
+  motivo,
+  esEmergencia: emergencia,
+  actualizadoPor: sesion.nombre,
+  actualizadoEn: new Date()
+},
+$push: {
+  historialCambios: auditoria
+}
     }
   );
 
