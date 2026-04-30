@@ -1891,6 +1891,15 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
     </h3>
 
     <div id="grupo-minutas-${puesto.replace(/\s+/g, "-").replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "")}" style="display:none;">
+<div class="botones no-print" style="margin-bottom:10px;">
+  <a class="btn btn-warning" href="/exportar-excel?puesto=${puesto}">
+    📊 Excel ${puesto}
+  </a>
+
+  <a class="btn btn-warning" href="/exportar-pdf?puesto=${puesto}">
+    📄 PDF ${puesto}
+  </a>
+</div>
       ${lista.map(m => {
         const alerta = detectarAlerta(m.novedad);
         const estadoTexto = m.estado || "Pendiente";
