@@ -2558,6 +2558,18 @@ function toggleProgramacion(id) {
   if (!el) return;
   el.style.display = el.style.display === "none" ? "block" : "none";
 }
+function toggleHistorial(id) {
+  const el = document.getElementById("historial-" + id);
+
+  if (!el) {
+    alert("No encontré el historial de esta asignación");
+    return;
+  }
+
+  el.style.display = el.style.display === "none" || el.style.display === ""
+    ? "block"
+    : "none";
+}
   </script>
 </head>
 
