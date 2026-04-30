@@ -2107,8 +2107,7 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
     ${
       asignaciones15Dias.length === 0
         ? "<p>No hay programación registrada para los próximos 15 días.</p>"
-        : programacionPorGestorSupervisor
-    }
+: "<p>Programación en carga...</p>"    }
   </div>
 `;
 
