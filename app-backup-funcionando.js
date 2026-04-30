@@ -2046,34 +2046,6 @@ const historial = Object.entries(minutasPorPuestoApp).map(([puesto, lista]) => `
       </form>
     `;
 
-const programacionSimpleHTML = asignaciones15Dias.length === 0
-  ? "<p>No hay programación registrada para los próximos 15 días.</p>"
-  : asignaciones15Dias.map(a => {
-      const horario = a.tipoDia === "Descanso"
-        ? "Descanso"
-        : `${a.horaInicioProgramada || ""} - ${a.horaFinProgramada || ""}`;
-
-      return `
-        <div class="turno-card">
-          <p><b>Gestor:</b> ${a.gestor || ""}</p>
-          <p><b>Fecha:</b> ${a.fecha || ""}</p>
-          <p><b>Puesto:</b> ${a.puesto || ""}</p>
-          <p><b>Horario:</b> ${horario}</p>
-          <p><b>Tipo:</b> ${a.tipoDia || "Turno"}</p>
-          <p><b>Motivo:</b> ${a.motivo || ""}</p>
-
-          <div class="botones no-print">
-            <a class="btn btn-warning" href="/editar-asignacion?id=${a._id}">✏️ Editar</a>
-
-            <form method="POST" style="box-shadow:none;padding:0;margin:0;">
-              <input type="hidden" name="accion" value="eliminar_asignacion">
-              <input type="hidden" name="id" value="${a._id}">
-              <button class="btn-danger">🗑️ Eliminar</button>
-            </form>
-          </div>
-        </div>
-      `;
-    }).join("");
 
     const formularioAsignacion = `
   <div class="panel">
@@ -2132,7 +2104,10 @@ const programacionSimpleHTML = asignaciones15Dias.length === 0
 
       <h3>🗓️ Programación próximos 15 días por gestor</h3>
 
-    ${programacionSimpleHTML}
+    ${
+      asignaciones15Dias.length === 0
+        ? "<p>No hay programación registrada para los próximos 15 días.</p>"
+: "<p>Programación en carga...</p>"    }
   </div>
 `;
 
