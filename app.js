@@ -575,6 +575,71 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+  if (req.url.startsWith("/exportar-programacion-excel")) {
+    if (!sesion || sesion.rol !== "supervisor") {
+      res.writeHead(302, { Location: "/" });
+      res.end();
+      return;
+    }
+
+    const url = new URL(req.url, `http://${req.headers.host}`);
+    const usuarioFiltro = url.searchParams.get("usuario") || "";
+
+    const diasProgramacion = proximosDiasColombia(15);
+    const fechasProgramacion = diasProgramacion.map(d => d.fecha);
+
+    const filtro = {
+      fecha: { $in: fechasProgramacion }
+    };
+
+    if (usuarioFiltro) {
+      filtro.usuario = usuarioFiltro;
+    }
+
+    const asignaciones = await db.collection("asignaciones")
+      .find(filtro)
+      .sort({ gestor: 1, fecha: 1 })
+      .toArray();
+
+    const workbook = new ExcelJS.Workbook();
+    const worksheet = workbook.addWorksheet("Programacion");
+
+    worksheet.columns = [
+      { header: "Fecha", key: "fecha", width: 15 },
+      { header: "Gestor", key: "gestor", width: 25 },
+      { header: "Puesto", key: "puesto", width: 22 },
+      { header: "Hora inicio", key: "horaInicioProgramada", width: 18 },
+      { header: "Hora fin", key: "horaFinProgramada", width: 18 },
+      { header: "Tipo de día", key: "tipoDia", width: 18 },
+      { header: "Motivo", key: "motivo", width: 35 },
+      { header: "Emergencia", key: "emergencia", width: 15 },
+      { header: "Actualizado por", key: "actualizadoPor", width: 22 }
+    ];
+
+    asignaciones.forEach(a => {
+      worksheet.addRow({
+        fecha: a.fecha || "",
+        gestor: a.gestor || "",
+        puesto: a.puesto || "",
+        horaInicioProgramada: a.tipoDia === "Descanso" ? "Descanso" : (a.horaInicioProgramada || ""),
+        horaFinProgramada: a.tipoDia === "Descanso" ? "Descanso" : (a.horaFinProgramada || ""),
+        tipoDia: a.tipoDia || "Turno",
+        motivo: a.motivo || "",
+        emergencia: a.esEmergencia ? "Sí" : "No",
+        actualizadoPor: a.actualizadoPor || ""
+      });
+    });
+
+    res.writeHead(200, {
+      "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "Content-Disposition": "attachment; filename=programacion.xlsx"
+    });
+
+    await workbook.xlsx.write(res);
+    res.end();
+    return;
+  }
+
   if (req.url.startsWith("/exportar-pdf")) {
     if (!sesion || sesion.rol !== "supervisor") {
       res.writeHead(302, { Location: "/" });
@@ -1688,6 +1753,7 @@ const programacionPorGestorSupervisor = Object.entries(usuarios)
 
 <div class="botones no-print" style="margin-bottom:15px;">
   <a class="btn btn-success" href="/programar-rango">📆 Programar varios días</a>
+  <a class="btn btn-warning" href="/exportar-programacion-excel">📊 Descargar programación Excel</a>
 </div>
 
     <form method="POST">
