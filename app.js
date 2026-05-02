@@ -846,11 +846,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── POST: guardar minuta (con multer + ubicación) ───────────────────────
   if (req.method === "POST" && req.url === "/guardar") {
-    if (!sesion || sesion.rol !== "gestor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereGestor(sesion, res)) return;
 
     upload.single("foto")(req, res, async err => {
       if (err) {
@@ -911,11 +907,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── POST: iniciar turno (con ubicación) ─────────────────────────────────
   if (req.method === "POST" && req.url === "/iniciar-turno") {
-    if (!sesion || sesion.rol !== "gestor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+   if (!requiereGestor(sesion, res)) return;
 
     let datos = "";
     req.on("data", parte => datos += parte);
@@ -1020,11 +1012,7 @@ const server = http.createServer(async (req, res) => {
 
   // ─── POST: cerrar turno (con ubicación) ──────────────────────────────────
   if (req.method === "POST" && req.url === "/cerrar-turno") {
-    if (!sesion || sesion.rol !== "gestor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereGestor(sesion, res)) return;
 
     let datos = "";
     req.on("data", parte => datos += parte);
