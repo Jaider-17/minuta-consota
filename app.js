@@ -1,27 +1,19 @@
+require("dotenv").config();
+
 const http = require("http");
-const { MongoClient, ObjectId } = require("mongodb");
+const { ObjectId } = require("mongodb");
+const { conectarDB } = require("./db/conexion");
 const fs = require("fs");
 const crypto = require("crypto");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
 const ExcelJS = require("exceljs");
 
-const MONGO_URL = process.env.MONGO_URL || "mongodb+srv://Jaider:1004756226@cluster0.rue5x5j.mongodb.net/?appName=Cluster0";
-
-const client = new MongoClient(MONGO_URL);
 let db;
 
-async function conectarDB() {
-  try {
-    await client.connect();
-    db = client.db("minutasDB");
-    console.log("🔥 Conectado a MongoDB");
-  } catch (error) {
-    console.error("❌ Error conectando a MongoDB:", error);
-  }
-}
-
-const dbReady = conectarDB();
+const dbReady = conectarDB().then(database => {
+  db = database;
+});
 
 if (!fs.existsSync("uploads")) {
   fs.mkdirSync("uploads");
