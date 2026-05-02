@@ -3,7 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
-const { iniciarTurno } = require("./routes/turnos");
+const { iniciarTurno, cerrarTurno } = require("./routes/turnos");
 const { marcarRevisada, eliminarMinuta, actualizarMinuta, guardarMinuta } = require("./routes/minutas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
@@ -876,99 +876,42 @@ if (req.method === "POST" && req.url === "/iniciar-turno") {
 
   // ─── POST: cerrar turno (con ubicación) ──────────────────────────────────
   if (req.method === "POST" && req.url === "/cerrar-turno") {
-    if (!requiereGestor(sesion, res)) return;
+  if (!requiereGestor(sesion, res)) return;
 
-    let datos = "";
-    req.on("data", parte => datos += parte);
+  let datos = "";
+  req.on("data", parte => datos += parte);
 
-    req.on("end", async () => {
-      const form = new URLSearchParams(datos);
+  req.on("end", async () => {
+    const form = new URLSearchParams(datos);
 
-      // Capturar ubicación de salida
-      const lat = parseFloat(form.get("lat") || 0);
-      const lng = parseFloat(form.get("lng") || 0);
-      const precision = parseFloat(form.get("precision") || 0);
-
-      const turnoActivo = await db.collection("turnos").findOne({
-        usuario: sesion.usuario,
-        estado: "Activo"
-      });
-
-      if (!turnoActivo) {
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
-
-      const { fecha, hora, fechaFiltro } = fechaColombia();
-
-      const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
-      const salida = new Date();
-      const tiempo = calcularTiempoTrabajado(entrada, salida);
-
-      const asignacionTurno = await db.collection("asignaciones").findOne({
-        usuario: sesion.usuario,
-        fecha: turnoActivo.fechaFiltro
-      });
-
-      const cumplimiento = analizarCumplimientoHorario(asignacionTurno, entrada, salida);
-
-      await db.collection("turnos").updateOne(
-        { _id: turnoActivo._id },
-        {
-          $set: {
-            fechaSalida: fecha,
-            fechaSalidaFiltro: fechaFiltro,
-            horaSalida: hora,
-            estado: "Cerrado",
-            cerradoEn: salida,
-            minutosTrabajados: tiempo.minutosTrabajados,
-            horasTrabajadas: tiempo.horasTrabajadas,
-            tiempoTrabajado: tiempo.textoTrabajado,
-            estadoCumplimiento: cumplimiento.estadoCumplimiento,
-            minutosTarde: cumplimiento.minutosTarde,
-            minutosSalidaTemprano: cumplimiento.minutosSalidaTemprano,
-            minutosExtra: cumplimiento.minutosExtra,
-            resumenCumplimiento: cumplimiento.resumenCumplimiento,
-            horarioProgramado: asignacionTurno
-              ? `${asignacionTurno.horaInicioProgramada || ""} - ${asignacionTurno.horaFinProgramada || ""}`
-              : "Sin horario",
-            // ── NUEVA UBICACIÓN DE SALIDA ──
-            ubicacionSalida: {
-              lat: lat || null,
-              lng: lng || null,
-              precision: precision || null,
-              timestamp: new Date()
-            }
-          }
-        }
-      );
-
-      res.writeHead(302, { Location: "/app" });
-      res.end();
+    await cerrarTurno(form, db, sesion, res, {
+      fechaColombia,
+      calcularTiempoTrabajado,
+      analizarCumplimientoHorario
     });
+  });
 
-    return;
-  }
+  return;
+}
 
-  if (req.method === "POST") {
-    let datos = "";
-    req.on("data", parte => datos += parte);
+if (req.method === "POST") {
+  let datos = "";
+  req.on("data", parte => datos += parte);
 
-    req.on("end", async () => {
-      const form = new URLSearchParams(datos);
-      const accion = form.get("accion");
+  req.on("end", async () => {
+    const form = new URLSearchParams(datos);
+    const accion = form.get("accion");
 
-     if (accion === "login") {
-    manejarLogin(form, res, {
-        usuarios,
-        sesiones,
-        enviarHTML,
-        vistaErrorLogin,
-        estilos,
-        crypto
-    });
-    return;
+if (accion === "login") {
+  manejarLogin(form, res, {
+    usuarios,
+    sesiones,
+    enviarHTML,
+    vistaErrorLogin,
+    estilos,
+    crypto
+  });
+  return;
 }
 
 if (accion === "revisada") {

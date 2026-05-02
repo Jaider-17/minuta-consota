@@ -97,6 +97,81 @@ async function iniciarTurno(form, db, sesion, res, helpers) {
   res.end();
 }
 
+async function cerrarTurno(form, db, sesion, res, helpers) {
+  const {
+    fechaColombia,
+    calcularTiempoTrabajado,
+    analizarCumplimientoHorario
+  } = helpers;
+
+  const lat = parseFloat(form.get("lat") || 0);
+  const lng = parseFloat(form.get("lng") || 0);
+  const precision = parseFloat(form.get("precision") || 0);
+
+  const turnoActivo = await db.collection("turnos").findOne({
+    usuario: sesion.usuario,
+    estado: "Activo"
+  });
+
+  if (!turnoActivo) {
+    res.writeHead(302, { Location: "/app" });
+    res.end();
+    return;
+  }
+
+  const { fecha, hora, fechaFiltro } = fechaColombia();
+
+  const entrada = turnoActivo.creadoEn ? new Date(turnoActivo.creadoEn) : new Date();
+  const salida = new Date();
+
+  const tiempo = calcularTiempoTrabajado(entrada, salida);
+
+  const asignacionTurno = await db.collection("asignaciones").findOne({
+    usuario: sesion.usuario,
+    fecha: turnoActivo.fechaFiltro
+  });
+
+  const cumplimiento = analizarCumplimientoHorario(
+    asignacionTurno,
+    entrada,
+    salida
+  );
+
+  await db.collection("turnos").updateOne(
+    { _id: turnoActivo._id },
+    {
+      $set: {
+        fechaSalida: fecha,
+        fechaSalidaFiltro: fechaFiltro,
+        horaSalida: hora,
+        estado: "Cerrado",
+        cerradoEn: salida,
+        minutosTrabajados: tiempo.minutosTrabajados,
+        horasTrabajadas: tiempo.horasTrabajadas,
+        tiempoTrabajado: tiempo.textoTrabajado,
+        estadoCumplimiento: cumplimiento.estadoCumplimiento,
+        minutosTarde: cumplimiento.minutosTarde,
+        minutosSalidaTemprano: cumplimiento.minutosSalidaTemprano,
+        minutosExtra: cumplimiento.minutosExtra,
+        resumenCumplimiento: cumplimiento.resumenCumplimiento,
+        horarioProgramado: asignacionTurno
+          ? `${asignacionTurno.horaInicioProgramada || ""} - ${asignacionTurno.horaFinProgramada || ""}`
+          : "Sin horario",
+        ubicacionSalida: {
+          lat: lat || null,
+          lng: lng || null,
+          precision: precision || null,
+          timestamp: new Date()
+        }
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+}
+
 module.exports = {
-  iniciarTurno
+  iniciarTurno,
+  cerrarTurno
 };
