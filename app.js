@@ -3,6 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
+const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
 const fs = require("fs");
@@ -1590,11 +1591,7 @@ if (accion === "revisada") {
 
   // ─── RUTA PRINCIPAL /app ──────────────────────────────────────────────────
   if (req.url.startsWith("/app")) {
-    if (!sesion) {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSesion(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
 
