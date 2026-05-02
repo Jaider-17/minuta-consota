@@ -368,28 +368,36 @@ const scriptUbicacion = `
 
   // ── Geolocalización ──────────────────────────────────────────────────────
   function obtenerUbicacion(callback) {
-    if (!navigator.geolocation) {
-      alert("⚠️ Tu dispositivo no soporta geolocalización. No puedes continuar sin ubicación.");
-      return;
-    }
-
-    navigator.geolocation.getCurrentPosition(
-      function(pos) {
-        callback({
-          lat: pos.coords.latitude,
-          lng: pos.coords.longitude,
-          precision: pos.coords.accuracy
-        });
-      },
-      function(error) {
-        let msg = "⚠️ Debes permitir el acceso a tu ubicación para continuar.";
-        if (error.code === error.TIMEOUT) msg = "⏱️ Tiempo de espera agotado. Intenta de nuevo.";
-        if (error.code === error.POSITION_UNAVAILABLE) msg = "📡 Ubicación no disponible. Verifica tu GPS.";
-        alert(msg);
-      },
-      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
-    );
+  if (!navigator.geolocation) {
+    alert("⚠️ Tu dispositivo no soporta geolocalización. Se enviará sin ubicación.");
+    callback({ lat: "", lng: "", precision: "" });
+    return;
   }
+
+  navigator.geolocation.getCurrentPosition(
+    function(pos) {
+      callback({
+        lat: pos.coords.latitude,
+        lng: pos.coords.longitude,
+        precision: pos.coords.accuracy
+      });
+    },
+    function(error) {
+      let msg = "⚠️ No se pudo obtener la ubicación. Se enviará sin GPS.";
+      if (error.code === error.TIMEOUT) msg = "⏱️ El GPS tardó mucho. Se enviará sin ubicación.";
+      if (error.code === error.POSITION_UNAVAILABLE) msg = "📡 GPS no disponible. Se enviará sin ubicación.";
+
+      alert(msg);
+
+      callback({
+        lat: "",
+        lng: "",
+        precision: ""
+      });
+    },
+    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
+  );
+}
 
   function enviarConUbicacion(formId, btnId) {
     const form = document.getElementById(formId);
