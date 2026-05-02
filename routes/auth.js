@@ -1,34 +1,26 @@
-function manejarLogin(req, res, { usuarios, sesiones, enviarHTML, vistaErrorLogin, estilos, crypto }) {
-    
-    let datos = "";
+function manejarLogin(form, res, { usuarios, sesiones, enviarHTML, vistaErrorLogin, estilos, crypto }) {
+  const usuario = (form.get("usuario") || "").toLowerCase();
+  const clave = form.get("clave");
 
-    req.on("data", parte => datos += parte);
+  if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
+    enviarHTML(res, vistaErrorLogin(estilos));
+    return;
+  }
 
-    req.on("end", () => {
-        const form = new URLSearchParams(datos);
-        const usuario = (form.get("usuario") || "").toLowerCase();
-        const clave = form.get("clave");
+  const id = crypto.randomBytes(16).toString("hex");
 
-        if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
-            enviarHTML(res, vistaErrorLogin(estilos));
-            return;
-        }
+  sesiones[id] = {
+    usuario,
+    nombre: usuarios[usuario].nombre,
+    rol: usuarios[usuario].rol
+  };
 
-        const id = crypto.randomBytes(16).toString("hex");
+  res.writeHead(302, {
+    "Set-Cookie": `sessionId=${id}; HttpOnly; Path=/`,
+    Location: "/app"
+  });
 
-        sesiones[id] = {
-            usuario,
-            nombre: usuarios[usuario].nombre,
-            rol: usuarios[usuario].rol
-        };
-
-        res.writeHead(302, {
-            "Set-Cookie": `sessionId=${id}; HttpOnly; Path=/`,
-            Location: "/app"
-        });
-
-        res.end();
-    });
+  res.end();
 }
 
 function manejarLogout(req, res, { sesiones }) {
@@ -37,9 +29,7 @@ function manejarLogout(req, res, { sesiones }) {
 
   if (partes) {
     const sessionId = partes.split("=")[1];
-    if (sessionId) {
-      delete sesiones[sessionId];
-    }
+    if (sessionId) delete sesiones[sessionId];
   }
 
   res.writeHead(302, {
@@ -49,7 +39,6 @@ function manejarLogout(req, res, { sesiones }) {
 
   res.end();
 }
-
 
 module.exports = {
   manejarLogin,

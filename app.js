@@ -1131,7 +1131,7 @@ const server = http.createServer(async (req, res) => {
       const accion = form.get("accion");
 
      if (accion === "login") {
-    manejarLogin(req, res, {
+    manejarLogin(form, res, {
         usuarios,
         sesiones,
         enviarHTML,
