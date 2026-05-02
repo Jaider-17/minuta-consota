@@ -31,6 +31,27 @@ function manejarLogin(req, res, { usuarios, sesiones, enviarHTML, vistaErrorLogi
     });
 }
 
+function manejarLogout(req, res, { sesiones }) {
+  const cookies = req.headers.cookie || "";
+  const partes = cookies.split(";").find(c => c.trim().startsWith("sessionId="));
+
+  if (partes) {
+    const sessionId = partes.split("=")[1];
+    if (sessionId) {
+      delete sesiones[sessionId];
+    }
+  }
+
+  res.writeHead(302, {
+    "Set-Cookie": "sessionId=; Max-Age=0; Path=/",
+    Location: "/"
+  });
+
+  res.end();
+}
+
+
 module.exports = {
-    manejarLogin
+  manejarLogin,
+  manejarLogout
 };

@@ -3,7 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
-const { manejarLogin } = require("./routes/auth");
+const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -1434,14 +1434,9 @@ if (accion === "revisada") {
   }
 
   if (req.url === "/logout") {
-    if (sessionId) delete sesiones[sessionId];
-    res.writeHead(302, {
-      "Set-Cookie": "sessionId=; Max-Age=0; Path=/",
-      Location: "/"
-    });
-    res.end();
-    return;
-  }
+  manejarLogout(req, res, { sesiones });
+  return;
+}
 
   if (req.url.startsWith("/editar-asignacion")) {
     if (!sesion || sesion.rol !== "supervisor") {
