@@ -3,7 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
-const { marcarRevisada } = require("./routes/minutas");
+const { marcarRevisada, eliminarMinuta } = require("./routes/minutas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
@@ -1325,15 +1325,11 @@ if (accion === "revisada") {
       }
 
       if (accion === "eliminar") {
-        if (!requiereSupervisor(sesion, res)) return;
+  if (!requiereSupervisor(sesion, res)) return;
 
-        const id = form.get("id");
-        await db.collection("minutas").deleteOne({ _id: new ObjectId(id) });
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
+  await eliminarMinuta(form, db, res);
+  return;
+}
 
       if (accion === "actualizar") {
         if (!requiereSupervisor(sesion, res)) return;
