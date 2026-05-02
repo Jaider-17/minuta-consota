@@ -3,6 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
+const { marcarRevisada } = require("./routes/minutas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
@@ -1110,16 +1111,9 @@ const server = http.createServer(async (req, res) => {
 if (accion === "revisada") {
   if (!requiereSupervisor(sesion, res)) return;
 
-        const id = form.get("id");
-        await db.collection("minutas").updateOne(
-          { _id: new ObjectId(id) },
-          { $set: { estado: "Revisada", revisadaPor: sesion.nombre, revisadaEn: new Date() } }
-        );
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
+  await marcarRevisada(form, db, sesion, res);
+  return;
+}
 
       if (accion === "asignar") {
         if (!requiereSupervisor(sesion, res)) return;
