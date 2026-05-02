@@ -429,11 +429,7 @@ const server = http.createServer(async (req, res) => {
   const sesion = sesiones[sessionId];
 
   if (req.url.startsWith("/exportar-excel")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const minutas = await obtenerMinutasFiltradas(url, sesion);
