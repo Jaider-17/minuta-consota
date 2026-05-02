@@ -3,7 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
-const { marcarRevisada, eliminarMinuta, actualizarMinuta } = require("./routes/minutas");
+const { marcarRevisada, eliminarMinuta, actualizarMinuta, guardarMinuta } = require("./routes/minutas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
@@ -845,171 +845,21 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
-  // ─── POST: guardar minuta (con multer + ubicación) ───────────────────────
-  if (req.method === "POST" && req.url === "/guardar") {
-    if (!requiereGestor(sesion, res)) return;
+ // ─── POST: guardar minuta (con multer + ubicación) ───────────────────────
+if (req.method === "POST" && req.url === "/guardar") {
+  if (!requiereGestor(sesion, res)) return;
 
-    upload.single("foto")(req, res, async err => {
-      if (err) {
-        enviarHTML(res, `<h1>Error subiendo foto ❌</h1><a href="/app">Volver</a>`);
-        return;
-      }
+  upload.single("foto")(req, res, async err => {
+    if (err) {
+      enviarHTML(res, `<h1>Error subiendo foto ❌</h1><a href="/app">Volver</a>`);
+      return;
+    }
 
-      let fotoUrl = "";
+    await guardarMinuta(req, db, sesion, res, cloudinary, fs);
+  });
 
-      try {
-        if (req.file) {
-          const resultado = await cloudinary.uploader.upload(req.file.path, {
-            folder: "minutas-consota"
-          });
-          fotoUrl = resultado.secure_url;
-          if (fs.existsSync(req.file.path)) fs.unlinkSync(req.file.path);
-        }
-
-        const { fecha, hora, fechaFiltro } = fechaColombia();
-
-        // Capturar ubicación enviada desde el frontend
-        const lat = parseFloat(req.body.lat || 0);
-        const lng = parseFloat(req.body.lng || 0);
-        const precision = parseFloat(req.body.precision || 0);
-
-        const minuta = {
-          fecha,
-          hora,
-          fechaFiltro,
-          usuario: sesion.usuario,
-          gestor: sesion.nombre,
-          puesto: req.body.puesto,
-          tipo: req.body.tipo,
-          novedad: req.body.novedad,
-          estado: "Pendiente",
-          foto: fotoUrl,
-          // ── NUEVA UBICACIÓN ──
-          ubicacion: {
-            lat: lat || null,
-            lng: lng || null,
-            precision: precision || null,
-            timestamp: new Date()
-          }
-        };
-
-        await db.collection("minutas").insertOne(minuta);
-
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-      } catch (error) {
-        console.error("Error guardando minuta:", error);
-        enviarHTML(res, `<h1>Error guardando la minuta ❌</h1><a href="/app">Volver</a>`);
-      }
-    });
-
-    return;
-  }
-
-  // ─── POST: iniciar turno (con ubicación) ─────────────────────────────────
-  if (req.method === "POST" && req.url === "/iniciar-turno") {
-   if (!requiereGestor(sesion, res)) return;
-
-    let datos = "";
-    req.on("data", parte => datos += parte);
-
-    req.on("end", async () => {
-      const form = new URLSearchParams(datos);
-      const puesto = form.get("puesto");
-      const { fecha, hora, fechaFiltro } = fechaColombia();
-
-      // Capturar ubicación
-      const lat = parseFloat(form.get("lat") || 0);
-      const lng = parseFloat(form.get("lng") || 0);
-      const precision = parseFloat(form.get("precision") || 0);
-
-      const turnoActivo = await db.collection("turnos").findOne({
-        usuario: sesion.usuario,
-        estado: "Activo"
-      });
-
-      if (turnoActivo) {
-        res.writeHead(302, { Location: "/app" });
-        res.end();
-        return;
-      }
-
-      const asignacionHoyTurno = await db.collection("asignaciones").findOne({
-        usuario: sesion.usuario,
-        fecha: fechaFiltro
-      });
-
-      if (!asignacionHoyTurno) {
-        enviarHTML(res, `
-          <html><head>${estilos}</head>
-          <body><div class="contenedor">
-            <div class="card alerta-roja">
-              <h2>🚫 No puedes iniciar turno</h2>
-              <p>No tienes programación asignada para hoy.</p>
-              <a class="btn" href="/app">⬅ Volver</a>
-            </div>
-          </div></body></html>
-        `);
-        return;
-      }
-
-      if ((asignacionHoyTurno.tipoDia || "Turno") !== "Turno") {
-        enviarHTML(res, `
-          <html><head>${estilos}</head>
-          <body><div class="contenedor">
-            <div class="card alerta-roja">
-              <h2>🚫 No puedes iniciar turno</h2>
-              <p>Hoy estás registrado como: <b>${asignacionHoyTurno.tipoDia}</b>.</p>
-              <a class="btn" href="/app">⬅ Volver</a>
-            </div>
-          </div></body></html>
-        `);
-        return;
-      }
-
-      if (asignacionHoyTurno.puesto !== puesto) {
-        enviarHTML(res, `
-          <html><head>${estilos}</head>
-          <body><div class="contenedor">
-            <div class="card alerta-roja">
-              <h2>🚫 Puesto incorrecto</h2>
-              <p>Hoy estás asignado a: <b>${asignacionHoyTurno.puesto}</b></p>
-              <p>No puedes iniciar turno en: <b>${puesto}</b></p>
-              <a class="btn" href="/app">⬅ Volver</a>
-            </div>
-          </div></body></html>
-        `);
-        return;
-      }
-
-      const turno = {
-        gestor: sesion.nombre,
-        usuario: sesion.usuario,
-        puesto,
-        fecha,
-        fechaFiltro,
-        horaEntrada: hora,
-        tipoTurno: obtenerTipoTurno(),
-        estado: "Activo",
-        asignacionId: asignacionHoyTurno._id,
-        creadoEn: new Date(),
-        // ── NUEVA UBICACIÓN DE ENTRADA ──
-        ubicacionEntrada: {
-          lat: lat || null,
-          lng: lng || null,
-          precision: precision || null,
-          timestamp: new Date()
-        }
-      };
-
-      await db.collection("turnos").insertOne(turno);
-
-      res.writeHead(302, { Location: "/app" });
-      res.end();
-    });
-
-    return;
-  }
+  return;
+}
 
   // ─── POST: cerrar turno (con ubicación) ──────────────────────────────────
   if (req.method === "POST" && req.url === "/cerrar-turno") {
