@@ -3,6 +3,7 @@ require("dotenv").config();
 const http = require("http");
 const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
+const { manejarLogin } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
 const fs = require("fs");
 const crypto = require("crypto");
@@ -1129,38 +1130,24 @@ const server = http.createServer(async (req, res) => {
       const form = new URLSearchParams(datos);
       const accion = form.get("accion");
 
-      if (accion === "login") {
-        const usuario = (form.get("usuario") || "").toLowerCase();
-        const clave = form.get("clave");
+     if (accion === "login") {
+    manejarLogin(req, res, {
+        usuarios,
+        sesiones,
+        enviarHTML,
+        vistaErrorLogin,
+        estilos,
+        crypto
+    });
+    return;
+}
 
-        if (!usuarios[usuario] || usuarios[usuario].clave !== clave) {
-
-         enviarHTML(res, vistaErrorLogin(estilos));
-
-          return;
-        }
-
-        const id = crypto.randomBytes(16).toString("hex");
-        sesiones[id] = {
-          usuario,
-          nombre: usuarios[usuario].nombre,
-          rol: usuarios[usuario].rol
-        };
-
-        res.writeHead(302, {
-          "Set-Cookie": `sessionId=${id}; HttpOnly; Path=/`,
-          Location: "/app"
-        });
-        res.end();
-        return;
-      }
-
-      if (accion === "revisada") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+if (accion === "revisada") {
+  if (!sesion || sesion.rol !== "supervisor") {
+    res.writeHead(302, { Location: "/" });
+    res.end();
+    return;
+  }
 
         const id = form.get("id");
         await db.collection("minutas").updateOne(
