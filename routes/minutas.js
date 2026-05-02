@@ -18,7 +18,6 @@ async function marcarRevisada(form, db, sesion, res) {
   res.end();
 }
 
-
 async function eliminarMinuta(form, db, res) {
   const { ObjectId } = require("mongodb");
 
@@ -32,7 +31,28 @@ async function eliminarMinuta(form, db, res) {
   res.end();
 }
 
+async function actualizarMinuta(form, db, res) {
+  const { ObjectId } = require("mongodb");
+
+  const id = form.get("id");
+
+  await db.collection("minutas").updateOne(
+    { _id: new ObjectId(id) },
+    {
+      $set: {
+        puesto: form.get("puesto"),
+        tipo: form.get("tipo"),
+        novedad: form.get("novedad")
+      }
+    }
+  );
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+}
+
 module.exports = {
   marcarRevisada,
-  eliminarMinuta
+  eliminarMinuta,
+  actualizarMinuta
 };
