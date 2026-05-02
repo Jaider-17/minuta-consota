@@ -479,11 +479,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/exportar-programacion-excel")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+  if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const usuarioFiltro = url.searchParams.get("usuario") || "";
@@ -544,11 +540,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/exportar-turnos-excel")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const gestorFiltro = url.searchParams.get("gestor") || "";
@@ -633,11 +625,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/exportar-turnos-pdf")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const gestorFiltro = url.searchParams.get("gestor") || "";
@@ -728,11 +716,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/exportar-programacion-pdf")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+   if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const usuarioFiltro = url.searchParams.get("usuario") || "";
@@ -802,11 +786,7 @@ const server = http.createServer(async (req, res) => {
   }
 
   if (req.url.startsWith("/exportar-pdf")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const minutas = await obtenerMinutasFiltradas(url, sesion);
@@ -1140,11 +1120,7 @@ const server = http.createServer(async (req, res) => {
 }
 
 if (accion === "revisada") {
-  if (!sesion || sesion.rol !== "supervisor") {
-    res.writeHead(302, { Location: "/" });
-    res.end();
-    return;
-  }
+  if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         await db.collection("minutas").updateOne(
@@ -1158,11 +1134,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "asignar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const usuario = form.get("usuario");
         const puesto = form.get("puesto");
@@ -1207,11 +1179,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "eliminar_turno") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         await db.collection("turnos").deleteOne({ _id: new ObjectId(id), estado: "Cerrado" });
@@ -1222,11 +1190,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "eliminar_asignacion") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         await db.collection("asignaciones").deleteOne({ _id: new ObjectId(id) });
@@ -1237,11 +1201,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "actualizar_asignacion") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         const usuario = form.get("usuario");
@@ -1285,11 +1245,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "generar_rango") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const usuario = form.get("usuario");
         const puesto = form.get("puesto");
@@ -1351,11 +1307,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "guardar_rango") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const usuario = form.get("usuario");
         const puesto = form.get("puesto");
@@ -1391,11 +1343,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "eliminar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         await db.collection("minutas").deleteOne({ _id: new ObjectId(id) });
@@ -1406,11 +1354,7 @@ if (accion === "revisada") {
       }
 
       if (accion === "actualizar") {
-        if (!sesion || sesion.rol !== "supervisor") {
-          res.writeHead(302, { Location: "/" });
-          res.end();
-          return;
-        }
+        if (!requiereSupervisor(sesion, res)) return;
 
         const id = form.get("id");
         await db.collection("minutas").updateOne(
@@ -1436,11 +1380,7 @@ if (accion === "revisada") {
 }
 
   if (req.url.startsWith("/editar-asignacion")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+   if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const id = url.searchParams.get("id");
@@ -1500,11 +1440,7 @@ if (accion === "revisada") {
   }
 
   if (req.url.startsWith("/programar-rango")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+    if (!requiereSupervisor(sesion, res)) return;
 
     enviarHTML(res, `
       <html>
@@ -1541,11 +1477,7 @@ if (accion === "revisada") {
   }
 
   if (req.url.startsWith("/editar")) {
-    if (!sesion || sesion.rol !== "supervisor") {
-      res.writeHead(302, { Location: "/" });
-      res.end();
-      return;
-    }
+   if (!requiereSupervisor(sesion, res)) return;
 
     const url = new URL(req.url, `http://${req.headers.host}`);
     const id = url.searchParams.get("id");
