@@ -329,14 +329,12 @@ async function obtenerMinutasFiltradas(url, sesion) {
 // ─── SCRIPT DE GEOLOCALIZACIÓN (se inyecta en /app) ─────────────────────────
 const scriptUbicacion = `
 <script>
-  // ── Normalizar IDs ──
   function normalizarId(texto) {
     return String(texto)
       .replace(/\\s+/g, "-")
       .replace(/[^a-zA-Z0-9áéíóúÁÉÍÓÚñÑ-]/g, "");
   }
 
-  // ── Toggles ──
   function toggleGrupoMinutas(puesto) {
     const id = "grupo-minutas-" + normalizarId(puesto);
     const el = document.getElementById(id);
@@ -366,65 +364,50 @@ const scriptUbicacion = `
       ? "block" : "none";
   }
 
-  // ── Geolocalización ──────────────────────────────────────────────────────
-  function obtenerUbicacion(callback) {
-  if (!navigator.geolocation) {
-    alert("⚠️ Tu dispositivo no soporta geolocalización. Se enviará sin ubicación.");
-    callback({ lat: "", lng: "", precision: "" });
-    return;
-  }
-
-  navigator.geolocation.getCurrentPosition(
-    function(pos) {
-      callback({
-        lat: pos.coords.latitude,
-        lng: pos.coords.longitude,
-        precision: pos.coords.accuracy
-      });
-    },
-    function(error) {
-      let msg = "⚠️ No se pudo obtener la ubicación. Se enviará sin GPS.";
-      if (error.code === error.TIMEOUT) msg = "⏱️ El GPS tardó mucho. Se enviará sin ubicación.";
-      if (error.code === error.POSITION_UNAVAILABLE) msg = "📡 GPS no disponible. Se enviará sin ubicación.";
-
-      alert(msg);
-
-      callback({
-        lat: "",
-        lng: "",
-        precision: ""
-      });
-    },
-    { enableHighAccuracy: false, timeout: 8000, maximumAge: 60000 }
-  );
-}
-
   function enviarConUbicacion(formId, btnId) {
     const form = document.getElementById(formId);
     const btn = document.getElementById(btnId);
 
-    if (!form) return;
-
-    // Mostrar spinner en el botón
-    if (btn) {
-      btn.disabled = true;
-      btn.innerHTML = '<span class="spinner"></span> Obteniendo ubicación...';
+    if (!form) {
+      alert("No encontré el formulario: " + formId);
+      return;
     }
 
-    obtenerUbicacion(function(coords) {
-      form.querySelector('[name="lat"]').value = coords.lat;
-      form.querySelector('[name="lng"]').value = coords.lng;
-      form.querySelector('[name="precision"]').value = coords.precision;
-      form.submit();
-    });
+    if (btn) {
+      btn.disabled = true;
+      btn.innerHTML = '<span class="spinner"></span> Enviando...';
+    }
 
-    // Si el usuario tarda mucho o niega, restaurar botón después de 16s
+    function enviar(lat, lng, precision) {
+      const inputLat = form.querySelector('[name="lat"]');
+      const inputLng = form.querySelector('[name="lng"]');
+      const inputPrecision = form.querySelector('[name="precision"]');
+
+      if (inputLat) inputLat.value = lat || "";
+      if (inputLng) inputLng.value = lng || "";
+      if (inputPrecision) inputPrecision.value = precision || "";
+
+      form.submit();
+    }
+
+    if (!navigator.geolocation) {
+      enviar("", "", "");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      function(pos) {
+        enviar(pos.coords.latitude, pos.coords.longitude, pos.coords.accuracy);
+      },
+      function(error) {
+        enviar("", "", "");
+      },
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+    );
+
     setTimeout(function() {
-      if (btn && btn.disabled) {
-        btn.disabled = false;
-        btn.innerHTML = btn.getAttribute("data-texto-original") || "Intentar de nuevo";
-      }
-    }, 16000);
+      enviar("", "", "");
+    }, 7000);
   }
 </script>
 `;
