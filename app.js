@@ -403,12 +403,9 @@ const scriptUbicacion = `
       function(error) {
         enviar("", "", "");
       },
-      { enableHighAccuracy: false, timeout: 5000, maximumAge: 60000 }
+      { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 }
     );
 
-    setTimeout(function() {
-      enviar("", "", "");
-    }, 7000);
   }
 </script>
 `;
