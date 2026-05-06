@@ -1817,7 +1817,7 @@ if (accion === "revisada") {
     ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
   </div>
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
-          ${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
+          ${sesion.rol === "supervisor" ? formularioAsignacion + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
             <div class="panel">
               <h2>Panel Supervisor</h2>
