@@ -1797,26 +1797,25 @@ if (accion === "revisada") {
         <header>
           <div class="logo">CF</div>
           <h1>Minuta Digital Consotá</h1>
-      <div class="panel">
-        <h2>📊 Dashboard Gerencial</h2>
-        <div class="dashboard">
-          <div class="metric"><p>Novedades hoy</p><strong>${minutasHoy}</strong></div>
-          <div class="metric"><p>Novedades del mes</p><strong>${minutasMes}</strong></div>
-          <div class="metric"><p>Pendientes</p><strong>${pendientes}</strong></div>
-          <div class="metric"><p>Puestos activos</p><strong>${puestosActivos}</strong></div>
-        </div>
-        <h3>Por puesto</h3>
-        ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
-        <h3>Por gestor</h3>
-        ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
-        <h3>Total de horas trabajadas por gestor</h3>
-        ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
-      </div>
-    
           <p>${sesion.nombre} | ${sesion.rol}</p>
         </header>
 
         <div class="contenedor">
+<div class="panel">
+    <h2>📊 Dashboard Gerencial</h2>
+    <div class="dashboard">
+      <div class="metric"><p>Novedades hoy</p><strong>${minutasHoy}</strong></div>
+      <div class="metric"><p>Novedades del mes</p><strong>${minutasMes}</strong></div>
+      <div class="metric"><p>Pendientes</p><strong>${pendientes}</strong></div>
+      <div class="metric"><p>Puestos activos</p><strong>${puestosActivos}</strong></div>
+    </div>
+    <h3>Por puesto</h3>
+    ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
+    <h3>Por gestor</h3>
+    ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
+    <h3>Total de horas trabajadas por gestor</h3>
+    ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
+  </div>
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + dashboardSupervisor + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
