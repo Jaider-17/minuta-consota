@@ -98,11 +98,18 @@ function htmlControlHoras(controlHoras = []) {
   <a class="btn btn-warning" href="/exportar-control-horas-pdf">📄 PDF general</a>
 </div>
 
-      ${
-        controlHoras.length === 0
-          ? "<p>No hay gestores registrados.</p>"
-          : controlHoras.map(h => `
-            <details class="card">
+   ${
+  controlHoras.length === 0
+    ? "<p>No hay gestores registrados.</p>"
+    : `
+      <div style="
+        display:flex;
+        flex-direction:column;
+        gap:14px;
+        width:100%;
+      ">
+        ${controlHoras.map(h => `
+            <details class="card" style="width:100%; box-sizing:border-box; margin:0;">
               <summary style="cursor:pointer; font-size:18px; font-weight:bold; color:#005baa;">
                 👤 ${h.gestor} ⬇
               </summary>
@@ -138,10 +145,8 @@ function htmlControlHoras(controlHoras = []) {
                 </div>
               </div>
             </details>
-          `).join("")
-      }
-    </div>
-  `;
+          `).join("")}
+      </div>
 }
 
 module.exports = {
