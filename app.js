@@ -5,6 +5,7 @@ const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
 const { iniciarTurno, cerrarTurno } = require("./routes/turnos");
 const { marcarRevisada, eliminarMinuta, actualizarMinuta, guardarMinuta } = require("./routes/minutas");
+const { calcularControlHoras, htmlControlHoras } = require("./routes/horas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
@@ -1343,7 +1344,8 @@ if (accion === "revisada") {
     turnosCerrados.forEach(t => {
       horasPorGestor[t.gestor] = (horasPorGestor[t.gestor] || 0) + (t.horasTrabajadas || 0);
     });
-
+const controlHoras = await calcularControlHoras(db, usuarios);
+const controlHorasHTML = htmlControlHoras(controlHoras);
     const minutasOrdenadas = [...minutas].sort((a, b) => {
       const fechaA = `${a.fechaFiltro || ""} ${a.hora || ""}`;
       const fechaB = `${b.fechaFiltro || ""} ${b.hora || ""}`;
@@ -1818,6 +1820,9 @@ ${sesion.rol === "supervisor" ? `
    ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
   </div>
 ` : ""}
+
+${sesion.rol === "supervisor" ? controlHorasHTML : ""}
+
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
