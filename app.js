@@ -1527,6 +1527,7 @@ if (accion === "eliminar_todos_registros_horas") {
     });
 const controlHoras = await calcularControlHoras(db, usuarios);
 const controlHorasHTML = htmlControlHoras(controlHoras);
+const miControlHoras = controlHoras.find(h => h.usuario === sesion.usuario);
     const minutasOrdenadas = [...minutas].sort((a, b) => {
       const fechaA = `${a.fechaFiltro || ""} ${a.hora || ""}`;
       const fechaB = `${b.fechaFiltro || ""} ${b.hora || ""}`;
@@ -2002,7 +2003,20 @@ ${sesion.rol === "supervisor" ? `
 
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
 ${sesion.rol === "supervisor" ? controlHorasHTML : ""}
+${sesion.rol === "gestor" && miControlHoras ? `
+  <div class="panel">
+    <h2>🕒 Mis horas de la quincena</h2>
 
+    <div class="card">
+      <p><b>Periodo:</b> ${miControlHoras.fechaInicio} a ${miControlHoras.fechaFin}</p>
+      <p><b>Horas objetivo:</b> ${miControlHoras.horasObjetivo} h</p>
+      <p><b>Horas trabajadas:</b> ${miControlHoras.horasTrabajadas} h</p>
+      <p><b>Diferencia:</b> ${miControlHoras.diferencia} h</p>
+      <p><b>Turnos cerrados:</b> ${miControlHoras.totalTurnos}</p>
+      <p><b>Estado:</b> <span class="${miControlHoras.clase}">${miControlHoras.estado}</span></p>
+    </div>
+  </div>
+` : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
             <div class="panel">
