@@ -1801,6 +1801,7 @@ if (accion === "revisada") {
         </header>
 
         <div class="contenedor">
+${sesion.rol === "supervisor" ? `
 <div class="panel">
     <h2>📊 Dashboard Gerencial</h2>
     <div class="dashboard">
@@ -1814,8 +1815,9 @@ if (accion === "revisada") {
     <h3>Por gestor</h3>
     ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
     <h3>Total de horas trabajadas por gestor</h3>
-    ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
+   ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
   </div>
+` : ""}
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
