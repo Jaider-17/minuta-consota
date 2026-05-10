@@ -187,7 +187,55 @@ function htmlControlHoras(controlHoras = []) {
   `;
 }
 
+async function obtenerHistorialHoras(db) {
+  const historial = await db.collection("historialHoras")
+    .find()
+    .sort({ cerradoEn: -1 })
+    .limit(50)
+    .toArray();
+
+  return historial;
+}
+
+function htmlHistorialHoras(historial = []) {
+  return `
+    <div class="panel">
+      <h2>📚 Historial de quincenas cerradas</h2>
+      <p>
+        Aquí quedan guardadas las quincenas cerradas por el supervisor.
+      </p>
+
+      ${
+        historial.length === 0
+          ? "<p>No hay quincenas cerradas todavía.</p>"
+          : `
+            <div style="display:flex; flex-direction:column; gap:14px;">
+              ${historial.map(h => `
+                <div class="card">
+                  <h3>👤 ${h.gestor || ""}</h3>
+                  <p><b>Periodo:</b> ${h.fechaInicio || ""} a ${h.fechaFin || ""}</p>
+                  <p><b>Horas objetivo:</b> ${h.horasObjetivo || 0} h</p>
+                  <p><b>Horas trabajadas:</b> ${h.horasTrabajadas || 0} h</p>
+                  <p><b>Diferencia:</b> ${h.diferencia || 0} h</p>
+                  <p><b>Estado final:</b> ${h.estadoFinal || ""}</p>
+                  <p><b>Cerrado por:</b> ${h.cerradoPor || ""}</p>
+                  <p><b>Fecha de cierre:</b> ${
+                    h.cerradoEn
+                      ? new Date(h.cerradoEn).toLocaleString("es-CO", { timeZone: "America/Bogota" })
+                      : ""
+                  }</p>
+                </div>
+              `).join("")}
+            </div>
+          `
+      }
+    </div>
+  `;
+}
+
 module.exports = {
   calcularControlHoras,
-  htmlControlHoras
+  htmlControlHoras,
+  obtenerHistorialHoras,
+  htmlHistorialHoras
 };

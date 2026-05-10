@@ -5,7 +5,7 @@ const { ObjectId } = require("mongodb");
 const { conectarDB } = require("./db/conexion");
 const { iniciarTurno, cerrarTurno } = require("./routes/turnos");
 const { marcarRevisada, eliminarMinuta, actualizarMinuta, guardarMinuta } = require("./routes/minutas");
-const { calcularControlHoras, htmlControlHoras } = require("./routes/horas");
+const { calcularControlHoras, htmlControlHoras, obtenerHistorialHoras, htmlHistorialHoras } = require("./routes/horas");
 const { requiereSesion, requiereSupervisor, requiereGestor } = require("./routes/middlewares");
 const { manejarLogin, manejarLogout } = require("./routes/auth");
 const { estilos, vistaErrorLogin, vistaLogin } = require("./views/templates");
@@ -1083,6 +1083,57 @@ if (accion === "revisada") {
         return;
       }
 
+if (accion === "cerrar_quincena") {
+  if (!requiereSupervisor(sesion, res)) return;
+
+  const usuario = form.get("usuario");
+  const fechaInicio = form.get("fechaInicio");
+  const fechaFin = form.get("fechaFin");
+  const horasObjetivo = Number(form.get("horasObjetivo") || 0);
+  const horasTrabajadas = Number(form.get("horasTrabajadas") || 0);
+  const diferencia = Number(form.get("diferencia") || 0);
+
+  if (usuarios[usuario]) {
+    let estadoFinal = "Al día";
+
+    if (diferencia > 0) {
+      estadoFinal = "Horas extra";
+    }
+
+    if (diferencia < 0) {
+      estadoFinal = "Horas faltantes";
+    }
+
+    await db.collection("historialHoras").updateOne(
+      {
+        usuario,
+        fechaInicio,
+        fechaFin
+      },
+      {
+        $set: {
+          usuario,
+          gestor: usuarios[usuario].nombre,
+          fechaInicio,
+          fechaFin,
+          horasObjetivo,
+          horasTrabajadas,
+          diferencia,
+          estadoFinal,
+          cerradoPor: sesion.nombre,
+          cerradoPorUsuario: sesion.usuario,
+          cerradoEn: new Date()
+        }
+      },
+      { upsert: true }
+    );
+  }
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
 if (accion === "eliminar_registro_horas") {
   if (!requiereSupervisor(sesion, res)) return;
 
@@ -1528,6 +1579,8 @@ if (accion === "eliminar_todos_registros_horas") {
 const controlHoras = await calcularControlHoras(db, usuarios);
 const controlHorasHTML = htmlControlHoras(controlHoras);
 const miControlHoras = controlHoras.find(h => h.usuario === sesion.usuario);
+const historialHoras = sesion.rol === "supervisor" ? await obtenerHistorialHoras(db) : [];
+const historialHorasHTML = sesion.rol === "supervisor" ? htmlHistorialHoras(historialHoras) : "";
     const minutasOrdenadas = [...minutas].sort((a, b) => {
       const fechaA = `${a.fechaFiltro || ""} ${a.hora || ""}`;
       const fechaB = `${b.fechaFiltro || ""} ${b.hora || ""}`;
@@ -2003,6 +2056,7 @@ ${sesion.rol === "supervisor" ? `
 
           ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
 ${sesion.rol === "supervisor" ? controlHorasHTML : ""}
+${sesion.rol === "supervisor" ? historialHorasHTML : ""}
 ${sesion.rol === "gestor" && miControlHoras ? `
   <div class="panel">
     <h2>🕒 Mis horas de la quincena</h2>
