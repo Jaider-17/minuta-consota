@@ -93,6 +93,11 @@ function htmlControlHoras(controlHoras = []) {
         Aquí puedes revisar las horas trabajadas, horas objetivo, extras o faltantes de cada gestor.
       </p>
 
+<div class="botones no-print" style="margin-bottom:15px;">
+  <a class="btn btn-warning" href="/exportar-control-horas-excel">📊 Excel general</a>
+  <a class="btn btn-warning" href="/exportar-control-horas-pdf">📄 PDF general</a>
+</div>
+
       ${
         controlHoras.length === 0
           ? "<p>No hay gestores registrados.</p>"
@@ -110,10 +115,13 @@ function htmlControlHoras(controlHoras = []) {
                 <p><b>Turnos cerrados:</b> ${h.totalTurnos}</p>
                 <p><b>Estado:</b> <span class="${h.clase}">${h.estado}</span></p>
 
-                <div class="botones no-print" style="margin-top:10px;">
-                  <button type="button" class="btn btn-warning">
-                    📄 Ver detalle
-                  </button>
+              <a class="btn btn-warning" href="/exportar-control-horas-excel?usuario=${h.usuario}">
+  📊 Excel ${h.gestor}
+</a>
+
+<a class="btn btn-warning" href="/exportar-control-horas-pdf?usuario=${h.usuario}">
+  📄 PDF ${h.gestor}
+</a>
 
                   <form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
                     <input type="hidden" name="accion" value="cerrar_quincena">

@@ -530,6 +530,114 @@ const server = http.createServer(async (req, res) => {
     return;
   }
 
+if (req.url.startsWith("/exportar-control-horas-excel")) {
+  if (!requiereSupervisor(sesion, res)) return;
+
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const usuarioFiltro = url.searchParams.get("usuario") || "";
+
+  let controlHoras = await calcularControlHoras(db, usuarios);
+
+  if (usuarioFiltro) {
+    controlHoras = controlHoras.filter(h => h.usuario === usuarioFiltro);
+  }
+
+  const workbook = new ExcelJS.Workbook();
+  const worksheet = workbook.addWorksheet("Control horas");
+
+  worksheet.columns = [
+    { header: "Gestor", key: "gestor", width: 25 },
+    { header: "Periodo inicio", key: "fechaInicio", width: 18 },
+    { header: "Periodo fin", key: "fechaFin", width: 18 },
+    { header: "Horas objetivo", key: "horasObjetivo", width: 18 },
+    { header: "Horas trabajadas", key: "horasTrabajadas", width: 18 },
+    { header: "Diferencia", key: "diferencia", width: 18 },
+    { header: "Estado", key: "estado", width: 30 },
+    { header: "Turnos cerrados", key: "totalTurnos", width: 18 }
+  ];
+
+  controlHoras.forEach(h => {
+    worksheet.addRow({
+      gestor: h.gestor,
+      fechaInicio: h.fechaInicio,
+      fechaFin: h.fechaFin,
+      horasObjetivo: h.horasObjetivo,
+      horasTrabajadas: h.horasTrabajadas,
+      diferencia: h.diferencia,
+      estado: h.estado,
+      totalTurnos: h.totalTurnos
+    });
+  });
+
+  res.writeHead(200, {
+    "Content-Type": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    "Content-Disposition": "attachment; filename=control-horas.xlsx"
+  });
+
+  await workbook.xlsx.write(res);
+  res.end();
+  return;
+}
+
+if (req.url.startsWith("/exportar-control-horas-pdf")) {
+  if (!requiereSupervisor(sesion, res)) return;
+
+  const url = new URL(req.url, `http://${req.headers.host}`);
+  const usuarioFiltro = url.searchParams.get("usuario") || "";
+
+  let controlHoras = await calcularControlHoras(db, usuarios);
+
+  if (usuarioFiltro) {
+    controlHoras = controlHoras.filter(h => h.usuario === usuarioFiltro);
+  }
+
+  const filas = controlHoras.map(h => `
+    <tr>
+      <td>${h.gestor}</td>
+      <td>${h.fechaInicio} a ${h.fechaFin}</td>
+      <td>${h.horasObjetivo}</td>
+      <td>${h.horasTrabajadas}</td>
+      <td>${h.diferencia}</td>
+      <td>${h.estado}</td>
+      <td>${h.totalTurnos}</td>
+    </tr>
+  `).join("");
+
+  enviarHTML(res, `
+    <html>
+    <head>
+      <title>Control de horas</title>
+      ${estilos}
+      <style>
+        table { width:100%; border-collapse:collapse; font-size:13px; }
+        th, td { border:1px solid #ddd; padding:8px; text-align:left; }
+        th { background:#eaf3ff; color:#005baa; }
+      </style>
+    </head>
+    <body>
+      <div class="contenedor">
+        <h1>🕒 Control de horas por quincena</h1>
+        <button onclick="window.print()">📄 Descargar / Imprimir PDF</button>
+        <table>
+          <tr>
+            <th>Gestor</th>
+            <th>Periodo</th>
+            <th>Objetivo</th>
+            <th>Trabajadas</th>
+            <th>Diferencia</th>
+            <th>Estado</th>
+            <th>Turnos</th>
+          </tr>
+          ${filas || ""}
+        </table>
+        <br><a href="/app">⬅ Volver</a>
+      </div>
+    </body>
+    </html>
+  `);
+  return;
+}
+
   if (req.url.startsWith("/exportar-turnos-excel")) {
     if (!requiereSupervisor(sesion, res)) return;
 
