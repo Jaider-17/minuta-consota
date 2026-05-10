@@ -1083,6 +1083,79 @@ if (accion === "revisada") {
         return;
       }
 
+if (accion === "eliminar_registro_horas") {
+  if (!requiereSupervisor(sesion, res)) return;
+
+  const usuario = form.get("usuario");
+  const fechaInicio = form.get("fechaInicio");
+  const fechaFin = form.get("fechaFin");
+
+  if (usuarios[usuario]) {
+    await db.collection("ajustesHoras").updateOne(
+      {
+        usuario,
+        fechaInicio,
+        fechaFin,
+        accion: "eliminado"
+      },
+      {
+        $set: {
+          usuario,
+          gestor: usuarios[usuario].nombre,
+          fechaInicio,
+          fechaFin,
+          accion: "eliminado",
+          eliminadoPor: sesion.nombre,
+          eliminadoPorUsuario: sesion.usuario,
+          eliminadoEn: new Date()
+        }
+      },
+      { upsert: true }
+    );
+  }
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
+if (accion === "eliminar_todos_registros_horas") {
+  if (!requiereSupervisor(sesion, res)) return;
+
+  const { fechaInicio, fechaFin } = await calcularControlHoras(db, usuarios).then(lista => {
+    if (lista[0]) return { fechaInicio: lista[0].fechaInicio, fechaFin: lista[0].fechaFin };
+    return { fechaInicio: "", fechaFin: "" };
+  });
+
+  for (const [usuario, datos] of Object.entries(usuarios).filter(([u, d]) => d.rol === "gestor")) {
+    await db.collection("ajustesHoras").updateOne(
+      {
+        usuario,
+        fechaInicio,
+        fechaFin,
+        accion: "eliminado"
+      },
+      {
+        $set: {
+          usuario,
+          gestor: datos.nombre,
+          fechaInicio,
+          fechaFin,
+          accion: "eliminado",
+          eliminadoPor: sesion.nombre,
+          eliminadoPorUsuario: sesion.usuario,
+          eliminadoEn: new Date()
+        }
+      },
+      { upsert: true }
+    );
+  }
+
+  res.writeHead(302, { Location: "/app" });
+  res.end();
+  return;
+}
+
       if (accion === "eliminar_asignacion") {
         if (!requiereSupervisor(sesion, res)) return;
 
@@ -1927,9 +2000,9 @@ ${sesion.rol === "supervisor" ? `
   </div>
 ` : ""}
 
+          ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
 ${sesion.rol === "supervisor" ? controlHorasHTML : ""}
 
-          ${sesion.rol === "supervisor" ? filtrosSupervisor : ""}
           ${sesion.rol === "supervisor" ? formularioAsignacion + gestoresTurnoHTML + historialTurnosHTML : ""}
           ${sesion.rol === "gestor" ? programacionGestorHTML + formularioGestor : `
             <div class="panel">

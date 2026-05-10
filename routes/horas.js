@@ -39,6 +39,28 @@ async function calcularControlHoras(db, usuarios) {
   const resultado = [];
 
   for (const [usuario, datos] of gestores) {
+    const registroEliminado = await db.collection("ajustesHoras").findOne({
+      usuario,
+      fechaInicio,
+      fechaFin,
+      accion: "eliminado"
+    });
+
+    if (registroEliminado) {
+      resultado.push({
+        usuario,
+        gestor: datos.nombre,
+        fechaInicio,
+        fechaFin,
+        horasObjetivo: 42,
+        horasTrabajadas: 0,
+        diferencia: 0,
+        estado: `Registro eliminado por ${registroEliminado.eliminadoPor || "supervisor"}`,
+        clase: "estado-pendiente",
+        totalTurnos: 0
+      });
+      continue;
+    }
     const turnos = await db.collection("turnos").find({
       usuario,
       estado: "Cerrado",
@@ -96,6 +118,12 @@ function htmlControlHoras(controlHoras = []) {
       <div class="botones no-print" style="margin-bottom:15px;">
         <a class="btn btn-warning" href="/exportar-control-horas-excel">📊 Excel general</a>
         <a class="btn btn-warning" href="/exportar-control-horas-pdf">📄 PDF general</a>
+<form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
+  <input type="hidden" name="accion" value="eliminar_todos_registros_horas">
+  <button class="btn-danger" type="submit" onclick="return confirm('¿Eliminar el registro de horas de todos los gestores en esta quincena?');">
+    🗑️ Eliminar registros
+  </button>
+</form>
       </div>
 
       ${
@@ -125,6 +153,16 @@ function htmlControlHoras(controlHoras = []) {
                       <a class="btn btn-warning" href="/exportar-control-horas-pdf?usuario=${h.usuario}">
                         📄 PDF ${h.gestor}
                       </a>
+
+<form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
+  <input type="hidden" name="accion" value="eliminar_registro_horas">
+  <input type="hidden" name="usuario" value="${h.usuario}">
+  <input type="hidden" name="fechaInicio" value="${h.fechaInicio}">
+  <input type="hidden" name="fechaFin" value="${h.fechaFin}">
+  <button class="btn-danger" type="submit" onclick="return confirm('¿Eliminar registro de horas de ${h.gestor}?');">
+    🗑️ Eliminar registro
+  </button>
+</form>
 
                       <form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
                         <input type="hidden" name="accion" value="cerrar_quincena">
