@@ -93,60 +93,60 @@ function htmlControlHoras(controlHoras = []) {
         Aquí puedes revisar las horas trabajadas, horas objetivo, extras o faltantes de cada gestor.
       </p>
 
-<div class="botones no-print" style="margin-bottom:15px;">
-  <a class="btn btn-warning" href="/exportar-control-horas-excel">📊 Excel general</a>
-  <a class="btn btn-warning" href="/exportar-control-horas-pdf">📄 PDF general</a>
-</div>
-
-   ${
-  controlHoras.length === 0
-    ? "<p>No hay gestores registrados.</p>"
-    : `
-      <div style="
-        display:flex;
-        flex-direction:column;
-        gap:14px;
-        width:100%;
-      ">
-        ${controlHoras.map(h => `
-            <details class="card" style="width:100%; box-sizing:border-box; margin:0;">
-              <summary style="cursor:pointer; font-size:18px; font-weight:bold; color:#005baa;">
-                👤 ${h.gestor} ⬇
-              </summary>
-
-              <div style="margin-top:15px;">
-                <p><b>Periodo:</b> ${h.fechaInicio} a ${h.fechaFin}</p>
-                <p><b>Horas objetivo:</b> ${h.horasObjetivo} h</p>
-                <p><b>Horas trabajadas:</b> ${h.horasTrabajadas} h</p>
-                <p><b>Diferencia:</b> ${h.diferencia} h</p>
-                <p><b>Turnos cerrados:</b> ${h.totalTurnos}</p>
-                <p><b>Estado:</b> <span class="${h.clase}">${h.estado}</span></p>
-
-              <a class="btn btn-warning" href="/exportar-control-horas-excel?usuario=${h.usuario}">
-  📊 Excel ${h.gestor}
-</a>
-
-<a class="btn btn-warning" href="/exportar-control-horas-pdf?usuario=${h.usuario}">
-  📄 PDF ${h.gestor}
-</a>
-
-                  <form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
-                    <input type="hidden" name="accion" value="cerrar_quincena">
-                    <input type="hidden" name="usuario" value="${h.usuario}">
-                    <input type="hidden" name="fechaInicio" value="${h.fechaInicio}">
-                    <input type="hidden" name="fechaFin" value="${h.fechaFin}">
-                    <input type="hidden" name="horasObjetivo" value="${h.horasObjetivo}">
-                    <input type="hidden" name="horasTrabajadas" value="${h.horasTrabajadas}">
-                    <input type="hidden" name="diferencia" value="${h.diferencia}">
-                    <button class="btn-danger" type="submit" onclick="return confirm('¿Cerrar quincena de ${h.gestor}?');">
-                      🔒 Cerrar quincena
-                    </button>
-                  </form>
-                </div>
-              </div>
-            </details>
-          `).join("")}
+      <div class="botones no-print" style="margin-bottom:15px;">
+        <a class="btn btn-warning" href="/exportar-control-horas-excel">📊 Excel general</a>
+        <a class="btn btn-warning" href="/exportar-control-horas-pdf">📄 PDF general</a>
       </div>
+
+      ${
+        controlHoras.length === 0
+          ? "<p>No hay gestores registrados.</p>"
+          : `
+            <div style="display:flex; flex-direction:column; gap:14px; width:100%;">
+              ${controlHoras.map(h => `
+                <details class="card" style="width:100%; box-sizing:border-box; margin:0;">
+                  <summary style="cursor:pointer; font-size:18px; font-weight:bold; color:#005baa;">
+                    👤 ${h.gestor} ⬇
+                  </summary>
+
+                  <div style="margin-top:15px;">
+                    <p><b>Periodo:</b> ${h.fechaInicio} a ${h.fechaFin}</p>
+                    <p><b>Horas objetivo:</b> ${h.horasObjetivo} h</p>
+                    <p><b>Horas trabajadas:</b> ${h.horasTrabajadas} h</p>
+                    <p><b>Diferencia:</b> ${h.diferencia} h</p>
+                    <p><b>Turnos cerrados:</b> ${h.totalTurnos}</p>
+                    <p><b>Estado:</b> <span class="${h.clase}">${h.estado}</span></p>
+
+                    <div class="botones no-print" style="margin-top:10px;">
+                      <a class="btn btn-warning" href="/exportar-control-horas-excel?usuario=${h.usuario}">
+                        📊 Excel ${h.gestor}
+                      </a>
+
+                      <a class="btn btn-warning" href="/exportar-control-horas-pdf?usuario=${h.usuario}">
+                        📄 PDF ${h.gestor}
+                      </a>
+
+                      <form method="POST" style="display:inline; box-shadow:none; padding:0; margin:0;">
+                        <input type="hidden" name="accion" value="cerrar_quincena">
+                        <input type="hidden" name="usuario" value="${h.usuario}">
+                        <input type="hidden" name="fechaInicio" value="${h.fechaInicio}">
+                        <input type="hidden" name="fechaFin" value="${h.fechaFin}">
+                        <input type="hidden" name="horasObjetivo" value="${h.horasObjetivo}">
+                        <input type="hidden" name="horasTrabajadas" value="${h.horasTrabajadas}">
+                        <input type="hidden" name="diferencia" value="${h.diferencia}">
+                        <button class="btn-danger" type="submit" onclick="return confirm('¿Cerrar quincena de ${h.gestor}?');">
+                          🔒 Cerrar quincena
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                </details>
+              `).join("")}
+            </div>
+          `
+      }
+    </div>
+  `;
 }
 
 module.exports = {
