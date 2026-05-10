@@ -1816,8 +1816,6 @@ ${sesion.rol === "supervisor" ? `
     ${Object.entries(porPuesto).map(([p, c]) => `<p>${p}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
     <h3>Por gestor</h3>
     ${Object.entries(porGestor).map(([g, c]) => `<p>${g}: <b>${c}</b></p>`).join("") || "<p>Sin datos</p>"}
-    <h3>Total de horas trabajadas por gestor</h3>
-   ${Object.entries(horasPorGestor).map(([g, h]) => `<p>${g}: <b>${Number(h).toFixed(2)} horas</b></p>`).join("") || "<p>Sin turnos cerrados todavía.</p>"}
   </div>
 ` : ""}
 
